@@ -52,3 +52,20 @@ Podržane promenljive okruženja: `PORT` (podrazumevano 3000), `HOST` (podrazume
 - PDF podrška za srpska slova zavisi od dostupnog Unicode fonta na serveru.
 - Nema automatskog offline upisa: bez veze sa serverom ništa se ne smatra sačuvanim.
 - Nema automatskog startovanja servera pri podizanju Windowsa.
+
+
+## Valuta u verziji 1.1
+
+Valuta se bira u **Podešavanja → Valuta** (RSD, EUR, USD, CHF, GBP, BAM, HRK, MKD).
+Izabrana oznaka se koristi u dashboardu, cenovniku, radnim nalozima, statistici i CSV/PDF izveštajima.
+**Važno:** promena valute menja samo oznaku, **ne konvertuje iznose** i ne koristi devizni kurs.
+Zato pre promene valute proverite da li su postojeći unosi u željenoj valuti;
+za preračunavanje istorijskih podataka potreban je zaseban, kontrolisan postupak.
+Za postojeću instalaciju sačuvajte folder `data`, napravite backup i zamenite programske fajlove novim.
+
+
+## Verzija 1.2 — konverzija valute
+
+U Podešavanjima možete menjati valutu između RSD i EUR. Fiksni kurs je **1 EUR = 120 RSD** (korisnički definisan, ne tržišni kurs). Pri potvrdi aplikacija prvo pravi SQLite rezervnu kopiju, pa u jednoj transakciji konvertuje `spent_amount`, `charged_amount` u svim radnim nalozima i `price_amount` u cenovniku. Dashboard, statistika, CSV i PDF zatim prikazuju preračunate iznose u novoj valuti. Ne dodaju se nova finansijska polja.
+
+**Važno:** Iznosi se čuvaju kao celi brojevi najmanjih novčanih jedinica i zaokružuju na dve decimale. Višestruka konverzija napred-nazad može izazvati male razlike usled zaokruživanja. Za USD, CHF i druge valute konverzija nije dostupna jer kurs nije definisan. Ako je postojeća instalacija već označena drugom valutom, prvo ručno uskladite podatke iz rezervne kopije; aplikacija neće nagađati izvornu valutu.
