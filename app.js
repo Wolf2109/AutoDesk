@@ -743,7 +743,15 @@ async function statsPage(range = null) {
         
     wirePeriod(statsPage);
     $('#exportCsv').onclick = () => download('/export.csv' + q, 'autodesk-report.csv');
-    $('#exportPdf').onclick = () => download('/export.pdf' + q, 'autodesk-izvestaj.pdf');
+    $('#exportPdf').onclick = async () => {
+        // Open the tab during the click to avoid popup blockers.
+        const preview = window.open('', '_blank');
+        if (!preview) { toast('Dozvolite iskačuće prozore za pregled izveštaja.'); return; }
+        preview.document.title = 'AutoDesk – izveštaj';
+        preview.document.body.textContent = 'Priprema izveštaja…';
+        try { await api('/export.pdf' + q, { previewWindow: preview }); }
+        catch (e) { preview.close(); toast(e.message); }
+    };
 }
 
 async function download(url, name) {
@@ -752,7 +760,7 @@ async function download(url, name) {
             a = document.createElement('a'),
             href = URL.createObjectURL(blob);
         a.href = href;
-        if (name.toLowerCase().endsWith('.pdf')) {     a.target = '_blank'; } else {     a.download = name; }
+        a.download = name;
         document.body.append(a);
         a.click();
         a.remove();
