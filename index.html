@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="sr">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#151e2e">
+    <link rel="manifest" href="./manifest.json">
+    <link rel="stylesheet" href="./style.css">
+    <title>AutoDesk | Radionica</title>
+</head>
+<body>
+    <div id="app">
+        <aside id="sidebar">
+            <div class="brand">
+                <div>
+                    <strong>Auto Dijagnostika Lazarević</strong>
+                    <small>Evidencija </small>
+                </div>
+            </div>
+            <nav id="nav"></nav>
+            <div class="sidefoot">
+                <span id="serverDot">●</span> Server online 
+                <button id="logout">Odjava</button>
+            </div>
+        </aside>
+        
+        <div id="main">
+            <header>
+                <button id="menuBtn">☰</button>
+                <div>
+                    <small>Radionica</small>
+                    <h1 id="pageTitle">Dashboard</h1>
+                </div>
+                <div class="headerRight">
+                    <span id="today"></span>
+                    <button class="primary" id="quickOrder">+ Novi nalog</button>
+                </div>
+            </header>
+            <main id="content"></main>
+        </div>
+    </div>
+
+    <div id="toast" role="alert"></div>
+    
+    <div id="modal" class="modal hidden">
+        <div class="dialog">
+            <div class="modalTop">
+                <h2 id="modalTitle"></h2>
+                <button id="closeModal" class="iconBtn">✕</button>
+            </div>
+            <div id="modalBody"></div>
+        </div>
+    </div>
+
+    <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
+    <script src="./firebase-config.js"></script>
+    <script src="./cloud-sync.js"></script>
+    <script src="./local-api.js"></script>
+    <script src="./app.js" defer></script>
+</body>
+</html>
