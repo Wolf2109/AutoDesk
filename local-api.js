@@ -73,7 +73,7 @@ const LocalAPI = (() => {
   const num=x=>Number(x)||0;
   const stamp=()=>new Date().toISOString();
   const clone=x=>structuredClone(x);
-  function rich(s,o){const c=s.clients.find(x=>x.id===o.client_id),v=s.vehicles.find(x=>x.id===o.vehicle_id);return {...o,client_name:c?.name||'',vehicle_name:v?`${v.make} ${v.model} • ${v.registration||''}`:'',difference:num(o.charged_amount)-num(o.spent_amount)};}
+  function rich(s,o){const c=s.clients.find(x=>x.id===o.client_id),v=s.vehicles.find(x=>x.id===o.vehicle_id);return {...o,client_name:c?.name||'',vehicle_name:v?`${v.make} ${v.model} ${v.registration||''}`:'',difference:num(o.charged_amount)-num(o.spent_amount)};}
   const sorted=arr=>arr.sort((a,b)=>b.id-a.id);
   const csvField=x=>'"'+String(x??'').replace(/"/g,'""')+'"';
   function downloadCSV(rows,currency){const cols=['order_number','date','client_name','vehicle_name','description','notes','spent_amount','charged_amount','difference'];return new Blob(['\ufeff'+cols.concat('currency').join(',')+'\r\n'+rows.map(x=>cols.map(k=>csvField(k.endsWith('amount')||k==='difference'?(num(x[k])/100).toFixed(2):x[k])).concat(csvField(currency)).join(',')).join('\r\n')],{type:'text/csv;charset=utf-8'});}
