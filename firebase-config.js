@@ -8,5 +8,5 @@ window.AUTODESK_FIREBASE_CONFIG = {
   messagingSenderId: '718057199385',
   appId: '1:718057199385:web:a008cc0b5aadf730a2d788',
   measurementId: 'G-EVWG3MFD73',
-  ownerEmail: 'OVDE_TVOJ_EMAIL'
+  ownerEmail: 'alazarevic237@gmail.com'
 };
