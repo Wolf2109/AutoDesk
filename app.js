@@ -751,17 +751,16 @@ async function settingsPage() {
 }
 
 function loginScreen() {
-    document.body.innerHTML = `<div class="loginWrap"><div class="loginBox"><div class="brand"><div><strong>Auto Dijagnostika Lazarević</strong><small>Kontrolna tabla</small></div></div><h2>Prijava</h2><p>Prijavite se svojim Firebase nalogom.</p><form id="loginForm"><div class="field"><label>Email</label><input id="email" type="email" required autocomplete="username"></div><div class="field"><label>Lozinka</label><input id="password" type="password" required autocomplete="current-password"></div><button class="primary">Prijavi se</button></form><p><button type="button" class="secondary" id="registerOwner">Napravi prvi nalog</button> <button type="button" class="secondary" id="verifyOwner">Pošalji potvrdu emaila</button></p><p id="loginError" style="color:var(--red)"></p></div></div>`;
+    document.body.innerHTML = `<div class="loginWrap"><div class="loginBox"><div class="brand"><div><strong>Auto Dijagnostika Lazarević</strong><small>Kontrolna tabla</small></div></div><h2>Prijava</h2><p>Prijavite se svojim Firebase nalogom.</p><form id="loginForm"><div class="field"><label>Email</label><input id="email" type="email" required autocomplete="username"></div><div class="field"><label>Lozinka</label><input id="password" type="password" required autocomplete="current-password"></div><button class="primary">Prijavi se</button></form><p><button type="button" class="secondary" id="verifyOwner">Pošalji potvrdu emaila</button></p><p id="loginError" style="color:var(--red)"></p></div></div>`;
     if(!CloudSync.ready) $('#loginError').textContent='Prvo popunite firebase-config.js prema UPUTSTVO.md.';
-    $('#email').value=window.AUTODESK_FIREBASE_CONFIG?.ownerEmail?.startsWith('OVDE')?'':(window.AUTODESK_FIREBASE_CONFIG?.ownerEmail||'');
-    $('#registerOwner').onclick=async()=>{try{await CloudSync.register($('#email').value.trim(),$('#password').value);$('#loginError').textContent='Nalog napravljen. Otvorite email i potvrdite adresu, pa se prijavite.';}catch(e){$('#loginError').textContent=e.message;}};
+    $('#email').value='';
     $('#verifyOwner').onclick=async()=>{try{await CloudSync.resend($('#email').value.trim(),$('#password').value);$('#loginError').textContent='Poslat je email za potvrdu.';}catch(e){$('#loginError').textContent=e.message;}};
     $('#loginForm').onsubmit=async e=>{e.preventDefault();try{await CloudSync.login($('#email').value.trim(),$('#password').value);location.reload();}catch(err){$('#loginError').textContent=err.message;}};
 }
 
 async function init() {
     const current=await CloudSync.waitForAuth();
-    if (!current || !current.emailVerified || current.email.toLowerCase()!==window.AUTODESK_FIREBASE_CONFIG.ownerEmail.toLowerCase()) {
+    if (!current || current.uid!==window.AUTODESK_FIREBASE_CONFIG.ownerUid) {
         loginScreen();
         return;
     }

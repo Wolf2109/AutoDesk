@@ -2,13 +2,13 @@
 'use strict';
 const CloudSync = (() => {
   const cfg = window.AUTODESK_FIREBASE_CONFIG || {};
-  const ready = !!(cfg.apiKey && cfg.projectId && cfg.appId && cfg.ownerEmail && !cfg.apiKey.includes('OVDE'));
+  const ready = !!(cfg.apiKey && cfg.projectId && cfg.appId && cfg.ownerUid && !cfg.apiKey.includes('OVDE'));
   let auth, db;
   if(ready){
     firebase.initializeApp(cfg);
     auth=firebase.auth(); db=firebase.firestore();
   }
-  const user=()=>{const u=auth?.currentUser;if(!u||u.email?.toLowerCase()!==cfg.ownerEmail.toLowerCase()||!u.emailVerified)throw Error('Prijavite se potvrđenim vlasničkim nalogom.');return u;};
+  const user=()=>{const u=auth?.currentUser;if(!u||u.uid!==cfg.ownerUid)throw Error('Prijavite se vlasničkim nalogom.');return u;};
   const root=()=>db.collection('autodesk_users').doc(user().uid).collection('sync');
   async function load(){
     const meta=await root().doc('meta').get();
@@ -33,8 +33,19 @@ const CloudSync = (() => {
     await col.doc('meta').set({count:chunks.length,updatedAt:firebase.firestore.FieldValue.serverTimestamp()});
     for(let i=chunks.length;i<oldCount;i+=400){const batch=db.batch();for(let j=i;j<Math.min(oldCount,i+400);j++)batch.delete(col.doc('chunk_'+j));await batch.commit();}
   }
-  async function login(email,password){if(!ready)throw Error('Popunite firebase-config.js.');if(email.toLowerCase()!==cfg.ownerEmail.toLowerCase())throw Error('Ovaj nalog nema pristup.');const result=await auth.signInWithEmailAndPassword(email,password);if(!result.user.emailVerified){await auth.signOut();throw Error('Potvrdite email adresu pre prijave.');}return result;}
-  async function register(email,password){if(!ready||email.toLowerCase()!==cfg.ownerEmail.toLowerCase())throw Error('Nedozvoljen email.');const r=await auth.createUserWithEmailAndPassword(email,password);await r.user.sendEmailVerification();await auth.signOut();return true;}
-  async function resend(email,password){if(!ready||email.toLowerCase()!==cfg.ownerEmail.toLowerCase())throw Error('Nedozvoljen email.');const r=await auth.signInWithEmailAndPassword(email,password);if(!r.user.emailVerified)await r.user.sendEmailVerification();await auth.signOut();}
+  async function login(email,password){
+    if(!ready)throw Error('Firebase konfiguracija nije potpuna.');
+    const result=await auth.signInWithEmailAndPassword(email,password);
+    if(result.user.uid!==cfg.ownerUid){await auth.signOut();throw Error('Ovaj nalog nema pristup.');}
+    return result;
+  }
+  async function register(){throw Error('Nalog već postoji. Prijavite se postojećim Firebase nalogom.');}
+  async function resend(email,password){
+    if(!ready)throw Error('Firebase nije podešen.');
+    const result=await auth.signInWithEmailAndPassword(email,password);
+    if(result.user.uid!==cfg.ownerUid){await auth.signOut();throw Error('Ovaj nalog nema pristup.');}
+    if(!result.user.emailVerified)await result.user.sendEmailVerification();
+    await auth.signOut();
+  }
   return {ready,load,save,login,register,resend,logout:()=>auth?.signOut(),currentUser:()=>auth?.currentUser,waitForAuth:()=>new Promise(resolve=>{if(!ready)return resolve(null);const off=auth.onAuthStateChanged(u=>{off();resolve(u);},()=>resolve(null));})};
 })();

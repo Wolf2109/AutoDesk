@@ -7,7 +7,7 @@
 3. Korisnički nalog napravićete **direktno na AutoDesk stranici** preko dugmeta **Napravi prvi nalog**. Firebase će poslati poruku za potvrdu emaila; otvorite je pre prijave. Ako poruka nije stigla, koristite **Pošalji potvrdu emaila**. **Ne isključujte bezbednosnu proveru.**
 4. **Firestore Database → Create database**, odaberite region i production mode.
 5. U **Firestore Database → Rules** nalepite sadržaj `firestore.rules` i umesto `OVDE_TVOJ_EMAIL` upišite **isti email** kao za prijavu. Kliknite **Publish**.
-6. **Project settings → Your apps → Web app**: registrujte Web aplikaciju i prepišite `apiKey`, `authDomain`, `projectId`, `appId` u `firebase-config.js`. U `ownerEmail` upišite isti email.
+6. **Project settings → Your apps → Web app**: registrujte Web aplikaciju i prepišite `apiKey`, `authDomain`, `projectId`, `appId` u `firebase-config.js`. U `ownerUid` upišite isti email.
 7. **Authentication → Settings → Authorized domains**: dodajte `KORISNICKOIME.github.io` (bez `https://` i bez putanje).
 
 **Napomena:** Firebase web config nije tajna, ali Firestore pravila jesu važna. Nikad ne postavljajte Service Account ključ, privatni ključ ili SQLite bazu na javni GitHub repozitorijum.
@@ -43,3 +43,7 @@ U posebnom fajlu `AutoDesk-podaci-za-uvoz.json` nalaze se podaci iz dostavljene 
 Konfiguracija Firebase projekta `evidencija-autodijagnostika` već je upisana u `firebase-config.js`. Pre objave zamenite `OVDE_TVOJ_EMAIL` u `firebase-config.js` i `firestore.rules` istom adresom kojom ćete se prijavljivati. Firestore pravila morate ručno objaviti u Firebase konzoli.
 
 Za prilagođeni domen u Authentication → Settings → Authorized domains dodajte `app.autodjiagnostikalazarevic.rs`. U GitHub Pages → Custom domain postavite isti poddomen i kreirajte odgovarajući CNAME DNS zapis.
+
+
+## Ispravka UID pristupa
+Ova verzija koristi ownerUid umesto ownerEmail. Postojeci nalog u Firebase Authentication se koristi za prijavu. Ne kreirati novi nalog u aplikaciji. Firestore pravila su uskladjena sa UID naloga.
