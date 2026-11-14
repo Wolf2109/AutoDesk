@@ -6,22 +6,66 @@ const LocalAPI = (() => {
   function open() { if (connection) return connection; connection = new Promise((resolve,reject) => { const r=indexedDB.open(DBNAME,1); r.onupgradeneeded=()=>r.result.createObjectStore('state'); r.onsuccess=()=>resolve(r.result); r.onerror=()=>reject(r.error); }); return connection; }
   async function localRead() { const db=await open(); return new Promise((resolve,reject)=>{const t=db.transaction('state','readonly'),r=t.objectStore('state').get('main');r.onsuccess=()=>resolve(r.result || {clients:[],vehicles:[],services:[],orders:[],photos:[],settings:{currency:'RSD'},seq:0,ids:{},backups:{}});r.onerror=()=>reject(r.error);}); }
   async function localWrite(s) { const db=await open(); return new Promise((resolve,reject)=>{const t=db.transaction('state','readwrite');t.objectStore('state').put(s,'main');t.oncomplete=resolve;t.onerror=()=>reject(t.error);}); }
-  // Cloud is authoritative; IndexedDB is a recoverable local cache.
+  // Keep a session cache for instant navigation. Mutations always fetch the latest
+  // cloud snapshot first, so a stale tab cannot silently overwrite another device.
   let cloudQueue=Promise.resolve();
-  async function read(){
+  let snapshot=null;
+  let initialLoad=null;
+  let lastCheck=0;
+  let backgroundLoad=null;
+  const RECHECK_MS=30000;
+  async function fetchCloud(){
     if(!window.CloudSync?.ready) throw Error('Firebase nije podešen. Pogledajte UPUTSTVO.md.');
     const remote=await CloudSync.load();
-    if(remote){ await localWrite(remote); return remote; }
+    if(remote){await localWrite(remote);return remote;}
     const local=await localRead();
     if(local.clients.length||local.orders.length||local.vehicles.length||local.services.length){
-      // First cloud sign-in: migrate existing IndexedDB records automatically.
       await CloudSync.save(local);
     }
     return local;
   }
+  async function read(fresh=false){
+    if(!window.CloudSync?.ready) throw Error('Firebase nije podešen. Pogledajte UPUTSTVO.md.');
+    if(fresh){
+      if(backgroundLoad) await backgroundLoad;
+      await cloudQueue.catch(()=>{});
+      const latest=await fetchCloud();
+      snapshot=latest;
+      lastCheck=Date.now();
+      return structuredClone(latest);
+    }
+    if(snapshot){
+      if(Date.now()-lastCheck>RECHECK_MS && !backgroundLoad){
+        backgroundLoad=(async()=>{
+          try{
+            await cloudQueue.catch(()=>{});
+            const updated=await fetchCloud();
+            snapshot=updated;
+            lastCheck=Date.now();
+          }catch(e){console.warn('Pozadinska sinhronizacija:',e);}
+          finally{backgroundLoad=null;}
+        })();
+      }
+      return structuredClone(snapshot);
+    }
+    if(!initialLoad){
+      initialLoad=(async()=>{
+        const first=await fetchCloud();
+        snapshot=first;
+        lastCheck=Date.now();
+        return first;
+      })().catch(e=>{initialLoad=null;throw e;});
+    }
+    return structuredClone(await initialLoad);
+  }
   async function write(s){
-    // Never report success if the cloud write failed.
-    const task=cloudQueue.catch(()=>{}).then(async()=>{await CloudSync.save(s);await localWrite(s);});
+    // A successful write means both Firestore and IndexedDB were updated.
+    const task=cloudQueue.catch(()=>{}).then(async()=>{
+      await CloudSync.save(s);
+      await localWrite(s);
+      snapshot=structuredClone(s);
+      lastCheck=Date.now();
+    });
     cloudQueue=task;
     return task;
   }
@@ -35,7 +79,7 @@ const LocalAPI = (() => {
   function downloadCSV(rows,currency){const cols=['order_number','date','client_name','vehicle_name','description','notes','spent_amount','charged_amount','difference'];return new Blob(['\ufeff'+cols.concat('currency').join(',')+'\r\n'+rows.map(x=>cols.map(k=>csvField(k.endsWith('amount')||k==='difference'?(num(x[k])/100).toFixed(2):x[k])).concat(csvField(currency)).join(',')).join('\r\n')],{type:'text/csv;charset=utf-8'});}
   async function call(url,opt={}) {
     const method=(opt.method||'GET').toUpperCase(),u=new URL(url,'https://local.invalid'),parts=u.pathname.split('/').filter(Boolean),table=parts[0],key=Number(parts[1]),q=u.searchParams;
-    const s=await read(), body=opt.body instanceof FormData?opt.body:opt.body?JSON.parse(opt.body):{};
+    const s=await read(method!=='GET'), body=opt.body instanceof FormData?opt.body:opt.body?JSON.parse(opt.body):{};
     const save=async result=>{await write(s);return result;};
     const next=t=>(s.ids[t]=(s.ids[t]||Math.max(0,...(s[t]||[]).map(x=>x.id)))+1);
     if(table==='health')return {ok:true};
