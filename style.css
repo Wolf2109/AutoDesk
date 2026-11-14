@@ -636,3 +636,10 @@ tbody tr:nth-child(odd) td { background: rgba(255,255,255,.012); }
 .remRow small { display: block; color: var(--muted); }
 .remRow .badge { margin: 0; }
 #quickStatus { width: 100%; margin-top: 6px; }
+
+/* Mobile sidebar dismissal, without changing desktop layout */
+#menuBackdrop { display:none; }
+@media (max-width:760px) {
+  #sidebar { z-index:1101; }
+  #menuBackdrop.visible { display:block; position:fixed; inset:0; z-index:1100; background:rgba(0,0,0,.48); }
+}

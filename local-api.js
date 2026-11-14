@@ -79,8 +79,6 @@ const LocalAPI = (() => {
   function downloadCSV(rows,currency){const cols=['order_number','date','client_name','vehicle_name','description','notes','spent_amount','charged_amount','difference'];return new Blob(['\ufeff'+cols.concat('currency').join(',')+'\r\n'+rows.map(x=>cols.map(k=>csvField(k.endsWith('amount')||k==='difference'?(num(x[k])/100).toFixed(2):x[k])).concat(csvField(currency)).join(',')).join('\r\n')],{type:'text/csv;charset=utf-8'});}
   async function call(url,opt={}) {
     const method=(opt.method||'GET').toUpperCase(),u=new URL(url,'https://local.invalid'),parts=u.pathname.split('/').filter(Boolean),table=parts[0],key=Number(parts[1]),q=u.searchParams;
-    // Legacy server routes use /export.pdf and /export.csv (not /export/pdf).
-    if(table==='export.pdf'||table==='export.csv'){parts[1]=table.slice('export.'.length);table='export';}
     const s=await read(method!=='GET'), body=opt.body instanceof FormData?opt.body:opt.body?JSON.parse(opt.body):{};
     const save=async result=>{await write(s);return result;};
     const next=t=>(s.ids[t]=(s.ids[t]||Math.max(0,...(s[t]||[]).map(x=>x.id)))+1);
@@ -108,6 +106,20 @@ const LocalAPI = (() => {
       if(table==='services')body.price_amount=num(body.price_amount);
       if(method==='POST'){const record={...body,id:next(table)};a.push(record);return save(clone(record));}
       if(method==='PUT'){const i=a.findIndex(x=>x.id===key);if(i<0)err('Zapis nije pronađen.');a[i]={...a[i],...body,id:key};return save(clone(a[i]));}
+    }
+    if(table==='orders' && parts[1]==='finish-all' && method==='POST') {
+      let updated=0;
+      for(const o of s.orders) {
+        if(o.status!=='done') { o.status='done'; o.updated_at=stamp(); updated++; }
+      }
+      if(updated) return save({ok:true,updated});
+      return {ok:true,updated:0};
+    }
+    if(table==='orders' && key && parts[2]==='status' && method==='PATCH') {
+      const o=s.orders.find(x=>x.id===key);
+      if(!o)err('Nalog nije pronađen.');
+      if(!['received','in_progress','waiting','done','delivered'].includes(body.status))err('Neispravan status.');
+      o.status=body.status;o.updated_at=stamp();return save({ok:true,status:o.status});
     }
     if(table==='orders'){
       if(method==='GET'){
@@ -145,7 +157,7 @@ const LocalAPI = (() => {
     if(table==='export'){
       const rows=s.orders.filter(o=>(!q.get('from')||o.date>=q.get('from'))&&(!q.get('to')||o.date<=q.get('to'))).map(o=>rich(s,o)).sort((a,b)=>b.date.localeCompare(a.date));
       if(parts[1]==='csv')return downloadCSV(rows,s.settings.currency||'RSD');
-      if(parts[1]==='pdf'){const w=opt.previewWindow || window.open('','_blank');if(!w)err('Dozvolite iskačuće prozore za PDF.');const escape=x=>String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));w.document.write('<!doctype html><html><head><meta charset="utf-8"><title>AutoDesk izveštaj</title><style>body{font:12px Arial;padding:25px}table{border-collapse:collapse;width:100%}td,th{border:1px solid #aaa;padding:6px;text-align:left}h1{font-size:20px}</style></head><body><h1>AutoDesk – izveštaj</h1><table><tr>'+['Broj','Datum','Klijent','Vozilo','Opis','Potrošeno','Naplaćeno','Razlika'].map(x=>'<th>'+x+'</th>').join('')+'</tr>'+rows.map(o=>'<tr>'+[o.order_number,o.date,o.client_name,o.vehicle_name,o.description,(o.spent_amount/100).toFixed(2),(o.charged_amount/100).toFixed(2),(o.difference/100).toFixed(2)].map(x=>'<td>'+escape(x)+'</td>').join('')+'</tr>').join('')+'</table><p>Valuta: '+escape(s.settings.currency||'RSD')+'</p></body></html>');w.document.close();return null;}
+      if(parts[1]==='pdf'){const w=window.open('','_blank');if(!w)err('Dozvolite iskačuće prozore za PDF.');const escape=x=>String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));w.document.write('<!doctype html><html><head><meta charset="utf-8"><title>AutoDesk izveštaj</title><style>body{font:12px Arial;padding:25px}table{border-collapse:collapse;width:100%}td,th{border:1px solid #aaa;padding:6px;text-align:left}h1{font-size:20px}</style></head><body><h1>AutoDesk – izveštaj</h1><table><tr>'+['Broj','Datum','Klijent','Vozilo','Opis','Potrošeno','Naplaćeno','Razlika'].map(x=>'<th>'+x+'</th>').join('')+'</tr>'+rows.map(o=>'<tr>'+[o.order_number,o.date,o.client_name,o.vehicle_name,o.description,(o.spent_amount/100).toFixed(2),(o.charged_amount/100).toFixed(2),(o.difference/100).toFixed(2)].map(x=>'<td>'+escape(x)+'</td>').join('')+'</tr>').join('')+'</table><p>Valuta: '+escape(s.settings.currency||'RSD')+'</p></body></html>');w.document.close();setTimeout(()=>w.print(),300);return null;}
     }
     if(table==='backups'){
       if(method==='GET'&&!parts[1])return Object.keys(s.backups||{}).sort().reverse();

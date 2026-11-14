@@ -98,6 +98,9 @@ async function loadBase() {
 async function navigate(page) {
     state.page = page;
     $('#sidebar')?.classList.remove('open');
+    $('#menuBackdrop')?.classList.remove('visible');
+    $('#menuBtn')?.setAttribute('aria-expanded', 'false');
+    $('#menuBtn')?.setAttribute('aria-label', 'Prikaži meni');
     renderNav();
     $('#pageTitle').textContent = navItems.find(x => x[0] === page)?.[2] || 'AutoDesk';
     
@@ -356,7 +359,7 @@ async function listPage(type, params = {}) {
                 <input class="search" id="searchInput" placeholder="Pretraži ${isOrder ? 'naloge, klijente, vozila, kodove grešaka' : ''}…" value="${esc(searchValue)}">
             </div>
             <div style="display:flex; gap:8px;">
-                ${isOrder ? `<button class="secondary" id="toggleFiltersBtn">⚙️ Filteri ${hasActiveFilters ? '(aktivni)' : ''}</button>` : ''}
+                ${isOrder ? `<button class="secondary" id="toggleFiltersBtn">⚙️ Filteri ${hasActiveFilters ? '(aktivni)' : ''}</button><button class="secondary" id="finishAllOrders">✓ Označi sve kao završene</button>` : ''}
                 <button class="primary" id="addEntity">+ Dodaj ${name}</button>
             </div>
         </div>
@@ -367,6 +370,22 @@ async function listPage(type, params = {}) {
     `;
 
     $('#content').innerHTML = contentHtml;
+    // Jedna potvrđena, atomska izmena u Firestore-u; ne menjamo naloge pri otvaranju sajta.
+    if (isOrder) {
+        $('#finishAllOrders').onclick = async () => {
+            const btn = $('#finishAllOrders');
+            const remaining = (await api('/orders')).filter(o => o.status !== 'done');
+            if (!remaining.length) { toast('Svi radni nalozi su već završeni.'); return; }
+            if (!confirm(`Označiti svih ${remaining.length} naloga koji nisu završeni kao „Završeno“? Ovo uključuje i preuzete naloge.`)) return;
+            btn.disabled = true;
+            try {
+                const result = await send('/orders/finish-all', 'POST', {});
+                toast(`Završeno: ${result.updated} naloga.`);
+                await listPage('orders', params);
+            } catch (e) { toast(e.message); btn.disabled = false; }
+        };
+    }
+
 
     // Funkcija za instant filtriranje u memoriji (Real-time)
     const renderTable = (searchQuery) => {
@@ -460,7 +479,8 @@ function closeModal() {
 }
 
 $('#closeModal').onclick = closeModal;
-$('#modal').onclick = e => { if (e.target.id === 'modal') closeModal(); };
+// Modali se zatvaraju isključivo preko dugmeta X ili akcija u modalu.
+// Klik izvan dijaloga ne odbacuje slučajno unete podatke.
 
 function field(label, name, value = '', type = 'text', required = false, extra = '') {
     return `<div class="field ${extra}"><label for="f_${name}">${label}</label>` +
@@ -881,7 +901,20 @@ setInterval(updateDateTime, 1000);
         location.reload();
     };
     
-    $('#menuBtn').onclick = () => $('#sidebar').classList.toggle('open');
+    const menuBtn = $('#menuBtn');
+    const sidebar = $('#sidebar');
+    const menuBackdrop = $('#menuBackdrop');
+    const setMenuOpen = open => {
+        sidebar.classList.toggle('open', open);
+        menuBackdrop.classList.toggle('visible', open);
+        menuBtn.setAttribute('aria-expanded', String(open));
+        menuBtn.setAttribute('aria-label', open ? 'Sakrij meni' : 'Prikaži meni');
+    };
+    menuBtn.onclick = () => setMenuOpen(!sidebar.classList.contains('open'));
+    menuBackdrop.onclick = () => setMenuOpen(false);
+    document.addEventListener('keydown', e => {
+        if (e.key === 'Escape' && sidebar.classList.contains('open')) setMenuOpen(false);
+    });
     await navigate('dashboard');
     
     if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js').catch(() => {});
