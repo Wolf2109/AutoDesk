@@ -11,7 +11,10 @@ const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({
 
 const formatVehicle = v => {
     if (!v) return '';
-    if (typeof v === 'string') return v.replace(/\s*[·.]\s*$/, '').trim();
+    if (typeof v === 'string') {
+        // Uklanja višak tačaka, crtica i razmaka na kraju ukoliko su ostali upisani
+        return v.replace(/\s*[·.\-]\s*$/, '').trim();
+    }
     const base = [v.make, v.model].filter(Boolean).join(' ').trim();
     const reg = (v.registration || '').trim();
     return reg ? `${base} · ${reg}` : base;
