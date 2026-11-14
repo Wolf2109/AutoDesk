@@ -79,6 +79,8 @@ const LocalAPI = (() => {
   function downloadCSV(rows,currency){const cols=['order_number','date','client_name','vehicle_name','description','notes','spent_amount','charged_amount','difference'];return new Blob(['\ufeff'+cols.concat('currency').join(',')+'\r\n'+rows.map(x=>cols.map(k=>csvField(k.endsWith('amount')||k==='difference'?(num(x[k])/100).toFixed(2):x[k])).concat(csvField(currency)).join(',')).join('\r\n')],{type:'text/csv;charset=utf-8'});}
   async function call(url,opt={}) {
     const method=(opt.method||'GET').toUpperCase(),u=new URL(url,'https://local.invalid'),parts=u.pathname.split('/').filter(Boolean),table=parts[0],key=Number(parts[1]),q=u.searchParams;
+    // Legacy server routes use /export.pdf and /export.csv (not /export/pdf).
+    if(table==='export.pdf'||table==='export.csv'){parts[1]=table.slice('export.'.length);table='export';}
     const s=await read(method!=='GET'), body=opt.body instanceof FormData?opt.body:opt.body?JSON.parse(opt.body):{};
     const save=async result=>{await write(s);return result;};
     const next=t=>(s.ids[t]=(s.ids[t]||Math.max(0,...(s[t]||[]).map(x=>x.id)))+1);
