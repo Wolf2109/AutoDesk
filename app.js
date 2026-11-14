@@ -9,6 +9,14 @@ const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({
     "'": '&#39;'
 }[c]));
 
+const formatVehicle = v => {
+    if (!v) return '';
+    if (typeof v === 'string') return v.replace(/\s*[·.]\s*$/, '').trim();
+    const base = [v.make, v.model].filter(Boolean).join(' ').trim();
+    const reg = (v.registration || '').trim();
+    return reg ? `${base} · ${reg}` : base;
+};
+
 const state = {
     page: 'dashboard',
     clients: [],
@@ -240,7 +248,7 @@ function ordersTable(rows) {
         `<th>Nalog</th><th>Klijent / Vozilo</th><th>Opis</th><th>Potrošeno</th><th>Naplaćeno</th><th>Razlika</th><th></th>` +
         `</tr></thead><tbody>${rows.map(o => `<tr>` +
         `<td><strong>${esc(o.order_number)}</strong><small>${esc(fd(o.date))}</small>${badge(o.status)}</td>` +
-        `<td>${esc(o.client_name)}<small>${esc(o.vehicle_name)}</small></td>` +
+        `<td>${esc(o.client_name)}<small>${esc(formatVehicle(o.vehicle_name))}</small></td>` +
         `<td>${esc(o.description.length > 85 ? o.description.slice(0, 85) + '…' : o.description)}${o.dtc_codes ? `<small>${esc(o.dtc_codes)}</small>` : ''}</td>` +
         `<td>${fmt(o.spent_amount)}</td>` +
         `<td>${fmt(o.charged_amount)}</td>` +
@@ -265,7 +273,7 @@ function reminderRow(x, todayIso) {
         if (reached) overdue = true;
         parts.push((reached ? 'dostignuto ' : 'na ') + nf(x.next_service_km) + ' km');
     }
-    return `<div class="remRow"><div><strong>${esc(x.vehicle_name)}</strong><small>${esc([x.registration, x.client_name, x.phone].filter(Boolean).join(' · '))}</small></div>` +
+    return `<div class="remRow"><div><strong>${esc(formatVehicle(x.vehicle_name))}</strong><small>${esc([x.registration, x.client_name, x.phone].filter(Boolean).join(' · '))}</small></div>` +
         `<span class="badge ${overdue ? 'bad' : 'warn'}">${esc(parts.join(' · '))}</span><button class="linkBtn" data-view="${x.id}">Nalog</button></div>`;
 }
 
@@ -312,7 +320,7 @@ const tableColumns = {
 function entityRows(type, rows) {
     return rows.map(x => {
         let vals = type === 'clients' ? [x.name, x.phone, x.email] :
-                   type === 'vehicles' ? [x.make + ' ' + x.model, state.clients.find(c => c.id === x.client_id)?.name || '', x.registration, x.vin] :
+                   type === 'vehicles' ? [[x.make, x.model].filter(Boolean).join(' '), state.clients.find(c => c.id === x.client_id)?.name || '', x.registration, x.vin] :
                    [x.name, fmt(x.price_amount)];
                    
         return `<tr>${vals.map(v => `<td>${esc(v)}</td>`).join('')}` +
@@ -336,7 +344,7 @@ async function listPage(type, params = {}) {
     let hasActiveFilters = isOrder && (params.from || params.to || params.client_id || params.vehicle_id || params.status);
     
     let clientsOptions = state.clients.map(c => `<option value="${c.id}" ${String(params.client_id) === String(c.id) ? 'selected' : ''}>${esc(c.name)}</option>`).join('');
-    let vehiclesOptions = state.vehicles.map(v => `<option value="${v.id}" ${String(params.vehicle_id) === String(v.id) ? 'selected' : ''}>${esc(v.make + ' ' + v.model + ' ' + (v.registration || ''))}</option>`).join('');
+    let vehiclesOptions = state.vehicles.map(v => `<option value="${v.id}" ${String(params.vehicle_id) === String(v.id) ? 'selected' : ''}>${esc(formatVehicle(v))}</option>`).join('');
 
     let filtersHtml = isOrder ? `
         <div class="panel" id="filtersPanel" style="display: ${hasActiveFilters ? 'block' : 'none'}; margin-bottom: 16px;">
@@ -370,7 +378,6 @@ async function listPage(type, params = {}) {
     `;
 
     $('#content').innerHTML = contentHtml;
-    // Jedna potvrđena, atomska izmena u Firestore-u; ne menjamo naloge pri otvaranju sajta.
     if (isOrder) {
         $('#finishAllOrders').onclick = async () => {
             const btn = $('#finishAllOrders');
@@ -386,8 +393,6 @@ async function listPage(type, params = {}) {
         };
     }
 
-
-    // Funkcija za instant filtriranje u memoriji (Real-time)
     const renderTable = (searchQuery) => {
         let q = searchQuery.toLowerCase().trim();
         let filtered = rows;
@@ -434,14 +439,12 @@ async function listPage(type, params = {}) {
         }
     };
 
-    // Incijalno iscrtavanje tabele
     renderTable(searchValue);
 
     $('#addEntity').onclick = () => isOrder ? orderForm() : entityForm(type);
 
     const searchInput = $('#searchInput');
 
-    // Real-time kucanje (odmah reaguje bez refresha)
     searchInput.oninput = e => {
         renderTable(e.target.value);
     };
@@ -479,8 +482,6 @@ function closeModal() {
 }
 
 $('#closeModal').onclick = closeModal;
-// Modali se zatvaraju isključivo preko dugmeta X ili akcija u modalu.
-// Klik izvan dijaloga ne odbacuje slučajno unete podatke.
 
 function field(label, name, value = '', type = 'text', required = false, extra = '') {
     return `<div class="field ${extra}"><label for="f_${name}">${label}</label>` +
@@ -565,7 +566,7 @@ function orderForm(item = {}) {
     if (!item.client_id && state.clients.length === 1) item = { ...item, client_id: state.clients[0].id };
     let clients = state.clients.map(x => ({ id: x.id, label: x.name }));
     let vehicles = state.vehicles.filter(x => !item.client_id || x.client_id === item.client_id)
-        .map(x => ({ id: x.id, label: x.make + ' ' + x.model + ' · ' + (x.registration || 'bez registracije') }));
+        .map(x => ({ id: x.id, label: formatVehicle(x) }));
     let statuses = Object.entries(STATUS).map(([k, [l]]) => ({ id: k, label: l }));
 
     let fields = field('Datum', 'date', item.date || today(), 'date', true) +
@@ -597,7 +598,7 @@ function orderForm(item = {}) {
     $('#f_client_id').onchange = e => {
         let options = state.vehicles.filter(v => v.client_id === +e.target.value);
         $('#f_vehicle_id').innerHTML = '<option value="">Izaberite vozilo</option>' +
-            options.map(v => `<option value="${v.id}">${esc(v.make + ' ' + v.model + ' · ' + (v.registration || 'bez registracije'))}</option>`).join('');
+            options.map(v => `<option value="${v.id}">${esc(formatVehicle(v))}</option>`).join('');
     };
 
     $('#f_vehicle_id').onchange = e => {
@@ -622,7 +623,7 @@ async function viewOrder(id) {
             `<div class="summaryRow">` +
             `<div><span class="muted">Datum</span><h3>${esc(fd(o.date))}</h3></div>` +
             `<div><span class="muted">Klijent</span><h3>${esc(o.client_name)}</h3></div>` +
-            `<div><span class="muted">Vozilo</span><h3>${esc(o.vehicle_name)}</h3></div>` +
+            `<div><span class="muted">Vozilo</span><h3>${esc(formatVehicle(o.vehicle_name))}</h3></div>` +
             `<div><span class="muted">Status</span><select id="quickStatus">${Object.entries(STATUS).map(([k, [l]]) => `<option value="${k}" ${o.status === k ? 'selected' : ''}>${l}</option>`).join('')}</select></div>` +
             `</div>` +
             (o.mileage != null ? `<p class="subtle">Kilometraža pri prijemu: <b>${nf(o.mileage)} km</b></p>` : '') +
