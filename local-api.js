@@ -109,21 +109,30 @@ const LocalAPI = (() => {
     }
     if(table==='orders'){
       if(method==='GET'){
+        if(key && parts[2]==='status' && method==='PATCH'){const o=s.orders.find(x=>x.id===key);if(!o)err('Nalog nije pronađen.');if(!['received','in_progress','waiting','done','delivered'].includes(body.status))err('Neispravan status.');o.status=body.status;o.updated_at=stamp();return save({ok:true,status:o.status});}
         if(key){const o=s.orders.find(x=>x.id===key);if(!o)err('Nalog nije pronađen.');return {...rich(s,o),photos:s.photos.filter(p=>p.work_order_id===key).map(p=>({id:p.id,url:'#photo-'+p.id}))};}
-        let rows=s.orders.filter(o=>(!q.get('from')||o.date>=q.get('from'))&&(!q.get('to')||o.date<=q.get('to'))&&(!q.get('client_id')||o.client_id===num(q.get('client_id')))&&(!q.get('vehicle_id')||o.vehicle_id===num(q.get('vehicle_id')))).map(o=>rich(s,o));
+        let rows=s.orders.filter(o=>(!q.get('status')||(q.get('status')==='active'?['received','in_progress','waiting'].includes(o.status||'done'):(o.status||'done')===q.get('status')))&&(!q.get('from')||o.date>=q.get('from'))&&(!q.get('to')||o.date<=q.get('to'))&&(!q.get('client_id')||o.client_id===num(q.get('client_id')))&&(!q.get('vehicle_id')||o.vehicle_id===num(q.get('vehicle_id')))).map(o=>rich(s,o));
         const search=(q.get('search')||'').toLowerCase();if(search)rows=rows.filter(o=>[o.order_number,o.description,o.client_name,o.vehicle_name].some(x=>String(x||'').toLowerCase().includes(search)));
         return rows.sort((a,b)=>b.date.localeCompare(a.date)||b.id-a.id);
       }
       if(parts[2]==='photos'&&method==='POST'){if(!s.orders.some(o=>o.id===key))err('Nalog nije pronađen.');const files=body.getAll('photos');if(files.length>12)err('Najviše 12 fotografija.');for(const f of files){if(!f.type.startsWith('image/'))err('Dozvoljene su samo slike.');if(f.size>12*1024*1024)err('Fotografija je prevelika.');s.photos.push({id:next('photos'),work_order_id:key,blob:f});}return save({ok:true});}
       if(method==='DELETE'){const i=s.orders.findIndex(o=>o.id===key);if(i<0)err('Nalog nije pronađen.');s.orders.splice(i,1);s.photos=s.photos.filter(p=>p.work_order_id!==key);return save({ok:true});}
       const client_id=num(body.client_id),vehicle_id=num(body.vehicle_id);if(!s.clients.some(c=>c.id===client_id))err('Klijent ne postoji.');if(!s.vehicles.some(v=>v.id===vehicle_id&&v.client_id===client_id))err('Vozilo ne pripada izabranom klijentu.');if(!String(body.description||'').trim())err('Opis posla je obavezan.');
-      const values={...body,client_id,vehicle_id,spent_amount:num(body.spent_amount),charged_amount:num(body.charged_amount)};
+      const values={...body,client_id,vehicle_id,spent_amount:num(body.spent_amount),charged_amount:num(body.charged_amount),status:body.status||'done',next_service_km:body.next_service_km===''?null:(body.next_service_km==null?null:num(body.next_service_km)),next_service_date:body.next_service_date||null};
+      if(body.mileage!=null && body.mileage!==''){const v=s.vehicles.find(x=>x.id===vehicle_id);if(v)v.mileage=Math.max(num(v.mileage),num(body.mileage));}
       if(method==='POST'){const o={...values,id:next('orders'),order_number:'RN-'+String(++s.seq).padStart(6,'0'),created_at:stamp(),updated_at:stamp()};s.orders.push(o);return save(rich(s,o));}
       if(method==='PUT'){const i=s.orders.findIndex(o=>o.id===key);if(i<0)err('Nalog nije pronađen.');s.orders[i]={...s.orders[i],...values,id:key,updated_at:stamp()};return save(rich(s,s.orders[i]));}
     }
     if(table==='photos'){
       const i=s.photos.findIndex(p=>p.id===key);if(i<0)err('Fotografija nije pronađena.');if(method==='GET')return s.photos[i].blob;
       if(method==='DELETE'){s.photos.splice(i,1);return save({ok:true});}
+    }
+    if(table==='reminders'){
+      const p=n=>String(n).padStart(2,'0'), d=new Date(), today=`${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}`;
+      d.setDate(d.getDate()+30);const cutoff=`${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}`;
+      const latest=new Map();for(const o of [...s.orders].sort((a,b)=>String(b.date).localeCompare(String(a.date))||b.id-a.id)){if(!latest.has(o.vehicle_id))latest.set(o.vehicle_id,o);}
+      const rows=[...latest.values()].filter(o=>{const v=s.vehicles.find(v=>v.id===o.vehicle_id);return (o.next_service_date&&o.next_service_date<=cutoff)||(o.next_service_km!=null&&v&&num(v.mileage)>=num(o.next_service_km));}).map(o=>{const v=s.vehicles.find(v=>v.id===o.vehicle_id),c=s.clients.find(c=>c.id===o.client_id);return {id:o.id,order_number:o.order_number,next_service_date:o.next_service_date,next_service_km:o.next_service_km,client_name:c?.name||'',phone:c?.phone||'',vehicle_name:v?`${v.make} ${v.model}`:'',registration:v?.registration||'',vehicle_mileage:v?.mileage??null};}).sort((a,b)=>(a.next_service_date||'9999').localeCompare(b.next_service_date||'9999')).slice(0,30);
+      return {today,rows};
     }
     if(table==='stats'){
       const rows=s.orders.filter(o=>(!q.get('from')||o.date>=q.get('from'))&&(!q.get('to')||o.date<=q.get('to'))),spent=rows.reduce((a,o)=>a+num(o.spent_amount),0),charged=rows.reduce((a,o)=>a+num(o.charged_amount),0);

@@ -39,6 +39,12 @@ const CloudSync = (() => {
     if(result.user.uid!==cfg.ownerUid){await auth.signOut();throw Error('Ovaj nalog nema pristup.');}
     return result;
   }
+  async function changePassword(current,next){
+    const u=user(); if(!current || !next || next.length<6)throw Error('Unesite postojeću i novu lozinku (min. 6 znakova).');
+    const credential=firebase.auth.EmailAuthProvider.credential(u.email,current);
+    await u.reauthenticateWithCredential(credential);
+    await u.updatePassword(next);
+  }
   async function register(){throw Error('Nalog već postoji. Prijavite se postojećim Firebase nalogom.');}
   async function resend(email,password){
     if(!ready)throw Error('Firebase nije podešen.');
@@ -47,7 +53,7 @@ const CloudSync = (() => {
     if(!result.user.emailVerified)await result.user.sendEmailVerification();
     await auth.signOut();
   }
-  return {ready,load,save,login,register,resend,logout:()=>auth?.signOut(),currentUser:()=>auth?.currentUser,waitForAuth:()=>new Promise(resolve=>{if(!ready)return resolve(null);const off=auth.onAuthStateChanged(u=>{off();resolve(u);},()=>resolve(null));})};
+  return {ready,load,save,login,register,resend,changePassword,logout:()=>auth?.signOut(),currentUser:()=>auth?.currentUser,waitForAuth:()=>new Promise(resolve=>{if(!ready)return resolve(null);const off=auth.onAuthStateChanged(u=>{off();resolve(u);},()=>resolve(null));})};
 })();
 
 window.CloudSync = CloudSync;
