@@ -49,3 +49,5 @@ const CloudSync = (() => {
   }
   return {ready,load,save,login,register,resend,logout:()=>auth?.signOut(),currentUser:()=>auth?.currentUser,waitForAuth:()=>new Promise(resolve=>{if(!ready)return resolve(null);const off=auth.onAuthStateChanged(u=>{off();resolve(u);},()=>resolve(null));})};
 })();
+
+window.CloudSync = CloudSync;
