@@ -752,7 +752,7 @@ async function download(url, name) {
             a = document.createElement('a'),
             href = URL.createObjectURL(blob);
         a.href = href;
-        a.download = name;
+        if (name.toLowerCase().endsWith('.pdf')) {     a.target = '_blank'; } else {     a.download = name; }
         document.body.append(a);
         a.click();
         a.remove();
