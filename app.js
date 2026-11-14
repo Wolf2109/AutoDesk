@@ -743,55 +743,18 @@ async function statsPage(range = null) {
         
     wirePeriod(statsPage);
     $('#exportCsv').onclick = () => download('/export.csv' + q, 'autodesk-report.csv');
-    $('#exportPdf').onclick = async () => {
-        // Open the tab during the click to avoid popup blockers.
-        const preview = window.open('', '_blank');
-        if (!preview) { toast('Dozvolite iskačuće prozore za pregled izveštaja.'); return; }
-        preview.document.title = 'AutoDesk – izveštaj';
-        preview.document.body.textContent = 'Priprema izveštaja…';
-        try { await api('/export.pdf' + q, { previewWindow: preview }); }
-        catch (e) { preview.close(); toast(e.message); }
-    };
+    $('#exportPdf').onclick = () => download('/export.pdf' + q, 'autodesk-izvestaj.pdf');
 }
 
-function escapePrint(value) {
-    return String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-}
-function openPrintDocument(title, columns, rows) {
-    const win = window.open('', '_blank');
-    if (!win) throw Error('Dozvolite otvaranje nove kartice za pregled izveštaja.');
-    const head = columns.map(c => `<th>${escapePrint(c)}</th>`).join('');
-    const body = rows.map(row => `<tr>${row.map(x => `<td>${escapePrint(x)}</td>`).join('')}</tr>`).join('');
-    win.document.open();
-    win.document.write(`<!doctype html><html lang="sr"><head><meta charset="utf-8"><title>${escapePrint(title)}</title><style>body{font:14px Arial,sans-serif;padding:28px;color:#222}h1{font-size:22px}table{border-collapse:collapse;width:100%}th,td{border:1px solid #bbb;padding:8px;text-align:left;vertical-align:top}th{background:#eee}@media print{body{padding:0}button{display:none}}</style></head><body><h1>${escapePrint(title)}</h1><button onclick="window.print()">Štampaj / Sačuvaj kao PDF</button><table><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table></body></html>`);
-    win.document.close();
-}
 async function download(url, name) {
     try {
-        // GitHub Pages cannot serve the old Node.js PDF routes. Render a printable preview instead.
-        const orderMatch = url.match(/^\/orders\/(\d+)\/pdf(?:\?|$)/);
-        const vehicleMatch = url.match(/^\/vehicles\/(\d+)\/history\.pdf(?:\?|$)/);
-        if (orderMatch) {
-            const o = await api('/orders/' + orderMatch[1]);
-            const s = await api('/settings');
-            const money = n => (Number(n || 0) / 100).toFixed(2) + ' ' + (s.currency || 'RSD');
-            openPrintDocument('Radni nalog ' + (o.order_number || ''), ['Podatak','Vrednost'], [
-                ['Broj naloga',o.order_number],['Datum',o.date],['Klijent',o.client_name],['Vozilo',o.vehicle_name],
-                ['Opis posla',o.description],['Napomene',o.notes],['Potrošeno',money(o.spent_amount)],
-                ['Naplaćeno',money(o.charged_amount)],['Razlika',money(o.difference)]]);
+        if (/^\/export\.pdf(?:\?|$)|^\/orders\/\d+\/pdf(?:\?|$)|^\/vehicles\/\d+\/history\.pdf(?:\?|$)/.test(url)) {
+            AutoDeskPrint.preview(url);
             return;
         }
-        if (vehicleMatch) {
-            const orders = await api('/orders?vehicle_id=' + vehicleMatch[1]);
-            const s = await api('/settings');
-            const money = n => (Number(n || 0) / 100).toFixed(2) + ' ' + (s.currency || 'RSD');
-            openPrintDocument('Servisna istorija vozila', ['Nalog','Datum','Klijent','Vozilo','Opis','Naplaćeno'],
-                orders.map(o => [o.order_number,o.date,o.client_name,o.vehicle_name,o.description,money(o.charged_amount)]));
-            return;
-        }
-        const result = await api(url);
-        if (!(result instanceof Blob)) throw Error('Izvoz nije vratio datoteku.');
-        const href = URL.createObjectURL(result);
+        const blob = await api(url);
+        if (!(blob instanceof Blob)) throw Error('Izvoz nije vratio datoteku.');
+        const href = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = href;
         a.download = name;
