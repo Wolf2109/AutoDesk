@@ -523,7 +523,10 @@ function entityForm(type, item = {}) {
                  field(moneyLabel('Cena'), 'price_amount', dec(item.price_amount), 'number');
     }
     
-    formShell(fields, b => send('/' + type + (item.id ? '/' + item.id : ''), item.id ? 'PUT' : 'POST', b));
+    formShell(fields, b => {
+        if (type === 'services') b.price_amount = Math.round(Number(b.price_amount || 0) * 100);
+        return send('/' + type + (item.id ? '/' + item.id : ''), item.id ? 'PUT' : 'POST', b);
+    });
 }
 
 async function removeEntity(type, id) {
@@ -566,6 +569,8 @@ function orderForm(item = {}) {
 
     formShell(fields, b => {
         if (!b.description.trim()) throw Error('Opis posla je obavezan.');
+        b.spent_amount = Math.round(Number(b.spent_amount || 0) * 100);
+        b.charged_amount = Math.round(Number(b.charged_amount || 0) * 100);
         return send('/orders' + (item.id ? '/' + item.id : ''), item.id ? 'PUT' : 'POST', b);
     });
 
