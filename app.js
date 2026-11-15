@@ -253,19 +253,36 @@ function statCard(label, value, cls = '', sub = '') {
 
 function chart(data) {
     if (!data.length) return '<div class="empty">Nema podataka za grafikon.</div>';
-    let W = 800, H = 240, px = 12, py = 24, base = H - py,
+    let W = 800, H = 240, px = 12, py = 24, base = H - py, n = data.length,
         max = Math.max(1, ...data.flatMap(x => [x.spent, x.charged])),
-        xy = key => data.map((x, i) => [px + i * (W - 2 * px) / Math.max(1, data.length - 1), base - (x[key] / max) * (H - 2 * py)]),
+        X = i => px + i * (W - 2 * px) / Math.max(1, n - 1),
+        Y = v => base - (v / max) * (H - 2 * py),
+        xy = key => data.map((x, i) => [X(i), Y(x[key])]),
         line = key => xy(key).map(p => p.join(',')).join(' '),
         c = xy('charged'),
         area = `${c[0][0]},${base} ${line('charged')} ${c[c.length - 1][0]},${base}`,
         grid = [0, .33, .66, 1].map(f => `<line x1="${px}" x2="${W - px}" y1="${py + f * (H - 2 * py)}" y2="${py + f * (H - 2 * py)}"/>`).join('');
-    return `<svg class="chart" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="Grafikon naplaćenog i potrošenog">` +
+
+    // Cifre na grafikonu: iznosi (bez decimala) iznad/ispod tačaka, datumi ispod ose i skala sa leve strane.
+    const short = v => nf(Math.round((Number(v) || 0) / 100));
+    const step = Math.max(1, Math.ceil(n / 8));
+    const labeled = i => i === n - 1 || (i % step === 0 && n - 1 - i >= step / 2);
+    let labels = '';
+    data.forEach((d, i) => {
+        if (!labeled(i)) return;
+        const left = (X(i) / W * 100).toFixed(2), edge = n > 1 ? (i === 0 ? 'first' : i === n - 1 ? 'last' : '') : '';
+        labels += `<span class="cv gold ${edge}" style="left:${left}%;top:${(Y(d.charged) / H * 100).toFixed(2)}%">${short(d.charged)}</span>`;
+        if (d.spent > 0) labels += `<span class="cv red ${edge}" style="left:${left}%;top:${(Y(d.spent) / H * 100).toFixed(2)}%">${short(d.spent)}</span>`;
+        labels += `<span class="cx ${edge}" style="left:${left}%">${esc(d.date.slice(8, 10) + '.' + d.date.slice(5, 7) + '.')}</span>`;
+    });
+    const scale = [0, .33, .66, 1].map(f => `<span class="cy" style="top:${((py + f * (H - 2 * py)) / H * 100).toFixed(2)}%">${short(max * (1 - f))}</span>`).join('');
+
+    return `<div class="chartBox"><svg class="chart" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="Grafikon naplaćenog i potrošenog">` +
         `<defs><linearGradient id="gArea" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#FFB81C" stop-opacity=".38"/><stop offset="1" stop-color="#FFB81C" stop-opacity="0"/></linearGradient></defs>` +
         grid + `<polygon points="${area}" fill="url(#gArea)" stroke="none"/>` +
         `<polyline points="${line('charged')}" fill="none" stroke="#FFB81C"/>` +
         `<polyline points="${line('spent')}" fill="none" stroke="#FF6B6B" stroke-dasharray="6 6"/>` +
-        `</svg><div class="legend"><span><i class="dot gold"></i>Naplaćeno</span><span><i class="dot red"></i>Potrošeno</span><em>${esc(fd(data[0].date))} — ${esc(fd(data[data.length - 1].date))}</em></div>`;
+        `</svg>${scale}${labels}</div><div class="legend"><span><i class="dot gold"></i>Naplaćeno</span><span><i class="dot red"></i>Potrošeno</span><em>${esc(fd(data[0].date))} — ${esc(fd(data[data.length - 1].date))} · iznosi u ${esc(state.currency)}</em></div>`;
 }
 
 function ordersTable(rows) {
@@ -990,10 +1007,9 @@ async function init() {
     menuBackdrop.onclick = () => setMenuOpen(false);
     document.addEventListener('keydown', e => {
         if (e.key !== 'Escape') return;
-        if (!$('#modal').classList.contains('hidden')) closeModal();
+        if (!$('#modal').classList.contains('hidden')) { if (!$('#editForm')) closeModal(); }
         else if (sidebar.classList.contains('open')) setMenuOpen(false);
     });
-    $('#modal').onclick = e => { if (e.target.id === 'modal') closeModal(); };
     await navigate('dashboard');
     
     if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js').catch(() => {});
