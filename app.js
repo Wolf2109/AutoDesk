@@ -32,7 +32,9 @@ const state = {
     period: 'month',
     statsMonth: '',
     currency: 'RSD',
-    dateFormat: 'DD.MM.YYYY'
+    dateFormat: 'DD.MM.YYYY',
+    ordersParams: {},
+    firstDate: ''
 };
 
 const navItems = [
@@ -74,6 +76,7 @@ const STATUS = {
     done: ['Završeno', 'ok'],
     delivered: ['Preuzeto', 'muted']
 };
+const telLink = p => `<a class="telLink" href="tel:${esc(String(p).replace(/[^\d+]/g, ''))}">${esc(p)}</a>`;
 const badge = s => `<span class="badge ${STATUS[s]?.[1] || 'muted'}">${STATUS[s]?.[0] || ''}</span>`;
 
 const toast = m => {
@@ -106,7 +109,19 @@ async function loadBase() {
     );
 }
 
-async function navigate(page) {
+const refresh = () => navigate(state.page, true);
+
+function syncStatus() {
+    const st = LocalAPI.status(), dot = $('#serverDot'), txt = $('#syncText'), banner = $('#banner');
+    if (dot) dot.style.color = st.offline ? '#E34B4B' : '#35C879';
+    if (txt) txt.textContent = st.offline ? 'Bez veze' : 'Sinhronizovano';
+    if (banner) {
+        banner.style.display = st.offline ? 'block' : 'none';
+        banner.textContent = 'Nema veze sa oblakom — prikazani su poslednji sačuvani podaci. Izmene nisu moguće dok se veza ne vrati.';
+    }
+}
+
+async function navigate(page, keep = false) {
     state.page = page;
     $('#sidebar')?.classList.remove('open');
     $('#menuBackdrop')?.classList.remove('visible');
@@ -114,7 +129,7 @@ async function navigate(page) {
     $('#menuBtn')?.setAttribute('aria-label', 'Prikaži meni');
     renderNav();
     $('#pageTitle').textContent = navItems.find(x => x[0] === page)?.[2] || 'AutoDesk';
-    
+
     try {
         let settings = await api('/settings');
         state.currency = currencies.includes(settings.currency) ? settings.currency : 'RSD';
@@ -122,15 +137,18 @@ async function navigate(page) {
         const brand = document.querySelector('#sidebar .brand strong');
         if (brand && settings.workshop_name) brand.textContent = settings.workshop_name;
         await loadBase();
-        
+
         if (page === 'dashboard') await dashboard();
-        else if (page === 'orders') await listPage('orders');
+        else if (page === 'orders') await listPage('orders', keep ? state.ordersParams : {});
         else if (['clients', 'vehicles', 'services'].includes(page)) await listPage(page);
         else if (page === 'stats') await statsPage();
         else if (page === 'settings') await settingsPage();
     } catch (e) {
         toast(e.message);
+        $('#content').innerHTML = `<section class="panel"><h3>Podaci nisu dostupni</h3><p class="subtle">${esc(e.message)}</p><button class="primary" id="retryLoad">Pokušaj ponovo</button></section>`;
+        $('#retryLoad').onclick = () => navigate(page, keep);
     }
+    syncStatus();
 }
 
 function periodRange(p) {
@@ -171,7 +189,8 @@ function dateControls(handler, initial = 'month') {
     let current = new Date();
     let monthOptions = [];
     let monthFormatter = new Intl.DateTimeFormat('sr-Latn-RS', { month: 'long' });
-    for (let y = current.getFullYear(); y > 2025; y--) {
+    const minYear = Math.min(current.getFullYear(), Number((state.firstDate || '').slice(0, 4)) || current.getFullYear());
+    for (let y = current.getFullYear(); y >= minYear; y--) {
         let lastMonth = y === current.getFullYear() ? current.getMonth() : 11;
         for (let m = lastMonth; m >= 0; m--) {
             let value = `${y}-${String(m + 1).padStart(2, '0')}`;
@@ -276,7 +295,7 @@ function reminderRow(x, todayIso) {
         if (reached) overdue = true;
         parts.push((reached ? 'dostignuto ' : 'na ') + nf(x.next_service_km) + ' km');
     }
-    return `<div class="remRow"><div><strong>${esc(formatVehicle(x.vehicle_name))}</strong><small>${esc([x.registration, x.client_name, x.phone].filter(Boolean).join(' · '))}</small></div>` +
+    return `<div class="remRow"><div><strong>${esc(formatVehicle(x.vehicle_name))}</strong><small>${esc([x.registration, x.client_name].filter(Boolean).join(' · '))}${x.phone ? ' · ' + telLink(x.phone) : ''}</small></div>` +
         `<span class="badge ${overdue ? 'bad' : 'warn'}">${esc(parts.join(' · '))}</span><button class="linkBtn" data-view="${x.id}">Nalog</button></div>`;
 }
 
@@ -316,17 +335,17 @@ async function dashboard() {
 
 const tableColumns = {
     clients: ['Ime i prezime', 'Telefon', 'Email', ''],
-    vehicles: ['Vozilo', 'Klijent', 'Registracija', 'VIN', ''],
+    vehicles: ['Vozilo', 'Klijent', 'Registracija', 'VIN', 'Km', ''],
     services: ['Usluga', 'Cena', '']
 };
 
 function entityRows(type, rows) {
     return rows.map(x => {
-        let vals = type === 'clients' ? [x.name, x.phone, x.email] :
-                   type === 'vehicles' ? [[x.make, x.model].filter(Boolean).join(' '), state.clients.find(c => c.id === x.client_id)?.name || '', x.registration, x.vin] :
-                   [x.name, fmt(x.price_amount)];
-                   
-        return `<tr>${vals.map(v => `<td>${esc(v)}</td>`).join('')}` +
+        let vals = type === 'clients' ? [esc(x.name), x.phone ? telLink(x.phone) : '', esc(x.email)] :
+                   type === 'vehicles' ? [esc([x.make, x.model].filter(Boolean).join(' ')), esc(state.clients.find(c => c.id === x.client_id)?.name || ''), esc(x.registration), esc(x.vin), x.mileage != null && x.mileage !== '' ? nf(x.mileage) : ''] :
+                   [esc(x.name), esc(fmt(x.price_amount))];
+
+        return `<tr>${vals.map(v => `<td>${v}</td>`).join('')}` +
             `<td><button class="linkBtn" data-edit="${x.id}">Izmeni</button> ` +
             `<button class="linkBtn" data-delete="${x.id}" style="color:var(--red)">Obriši</button>` +
             `${type === 'clients' || type === 'vehicles' ? ` <button class="linkBtn" data-history="${x.id}">Istorija</button>` : ''}` +
@@ -341,8 +360,10 @@ async function listPage(type, params = {}) {
     let url = '/' + type, query = new URLSearchParams();
     for (let [k, v] of Object.entries(params)) if (v && k !== 'search') query.set(k, v);
     
-    let rows = await api(url + (query.size ? '?' + query : ''));
+    const qs = query.toString();
+    let rows = await api(url + (qs ? '?' + qs : ''));
     state[type] = rows;
+    if (isOrder) state.ordersParams = params;
 
     let hasActiveFilters = isOrder && (params.from || params.to || params.client_id || params.vehicle_id || params.status);
     
@@ -370,7 +391,7 @@ async function listPage(type, params = {}) {
                 <input class="search" id="searchInput" placeholder="Pretraži ${isOrder ? 'naloge, klijente, vozila, kodove grešaka' : ''}…" value="${esc(searchValue)}">
             </div>
             <div style="display:flex; gap:8px;">
-                ${isOrder ? `<button class="secondary" id="toggleFiltersBtn">⚙️ Filteri ${hasActiveFilters ? '(aktivni)' : ''}</button><button class="secondary" id="finishAllOrders">✓ Označi sve kao završene</button>` : ''}
+                ${isOrder ? `<button class="secondary" id="toggleFiltersBtn">⚙️ Filteri ${hasActiveFilters ? '(aktivni)' : ''}</button><button class="secondary" id="finishAllOrders">✓ Završi sve otvorene</button>` : ''}
                 <button class="primary" id="addEntity">+ Dodaj ${name}</button>
             </div>
         </div>
@@ -384,9 +405,9 @@ async function listPage(type, params = {}) {
     if (isOrder) {
         $('#finishAllOrders').onclick = async () => {
             const btn = $('#finishAllOrders');
-            const remaining = (await api('/orders')).filter(o => o.status !== 'done');
-            if (!remaining.length) { toast('Svi radni nalozi su već završeni.'); return; }
-            if (!confirm(`Označiti svih ${remaining.length} naloga koji nisu završeni kao „Završeno“? Ovo uključuje i preuzete naloge.`)) return;
+            const open = await api('/orders?status=active');
+            if (!open.length) { toast('Nema otvorenih naloga.'); return; }
+            if (!confirm(`Označiti ${open.length} otvorenih naloga (primljeno, u radu, čeka deo) kao „Završeno“?`)) return;
             btn.disabled = true;
             try {
                 const result = await send('/orders/finish-all', 'POST', {});
@@ -396,7 +417,10 @@ async function listPage(type, params = {}) {
         };
     }
 
-    const renderTable = (searchQuery) => {
+    let shown = 100, currentQ = searchValue;
+    const renderTable = (searchQuery, reset = true) => {
+        if (reset) shown = 100;
+        currentQ = searchQuery;
         let q = searchQuery.toLowerCase().trim();
         let filtered = rows;
 
@@ -407,7 +431,9 @@ async function listPage(type, params = {}) {
                            (item.client_name && item.client_name.toLowerCase().includes(q)) ||
                            (item.vehicle_name && item.vehicle_name.toLowerCase().includes(q)) ||
                            (item.description && item.description.toLowerCase().includes(q)) ||
-                           (item.notes && item.notes.toLowerCase().includes(q));
+                           (item.notes && item.notes.toLowerCase().includes(q)) ||
+                           (item.complaint && item.complaint.toLowerCase().includes(q)) ||
+                           (item.dtc_codes && item.dtc_codes.toLowerCase().includes(q));
                 } else if (type === 'clients') {
                     return (item.name && item.name.toLowerCase().includes(q)) ||
                            (item.phone && item.phone.toLowerCase().includes(q)) ||
@@ -426,9 +452,13 @@ async function listPage(type, params = {}) {
             });
         }
 
-        $('#tableContainer').innerHTML = isOrder ? 
-            ordersTable(filtered) : 
-            `<div class="tableWrap"><table><thead><tr>${tableColumns[type].map(h => `<th>${h}</th>`).join('')}</tr></thead><tbody>${entityRows(type, filtered)}</tbody></table>${filtered.length ? '' : '<div class="empty">Nema unetih podataka.</div>'}</div>`;
+        const visible = filtered.slice(0, shown);
+        $('#tableContainer').innerHTML = (isOrder ?
+            ordersTable(visible) :
+            `<div class="tableWrap"><table><thead><tr>${tableColumns[type].map(h => `<th>${h}</th>`).join('')}</tr></thead><tbody>${entityRows(type, visible)}</tbody></table>${filtered.length ? '' : '<div class="empty">Nema unetih podataka.</div>'}</div>`) +
+            (filtered.length > shown ? `<div class="loadMore"><button class="secondary" id="showMore">Prikaži još (${filtered.length - shown})</button></div>` : '');
+        const more = $('#showMore');
+        if (more) more.onclick = () => { shown += 100; renderTable(currentQ, false); };
 
         if (isOrder) {
             wireOrderViews();
@@ -512,7 +542,7 @@ function formShell(body, callback) {
             await callback(b);
             closeModal();
             toast('Uspešno sačuvano.');
-            await navigate(state.page);
+            await refresh();
         } catch (err) {
             toast(err.message);
         }
@@ -530,7 +560,7 @@ function entityForm(type, item = {}) {
                  textArea('Napomena', 'notes', item.notes);
     }
     if (type === 'vehicles') {
-        fields = selectField('Klijent', 'client_id', state.clients.map(x => ({ id: x.id, label: x.name })), item.client_id) +
+        fields = selectField('Klijent', 'client_id', state.clients.map(x => ({ id: x.id, label: x.name })), item.client_id ?? (state.clients.length === 1 ? state.clients[0].id : '')) +
                  field('Marka', 'make', item.make, 'text', true) +
                  field('Model', 'model', item.model, 'text', true) +
                  field('Godište', 'year', item.year, 'number') +
@@ -575,10 +605,12 @@ function orderForm(item = {}) {
     let fields = field('Datum', 'date', item.date || today(), 'date', true) +
         selectField('Status', 'status', statuses, item.status || 'done') +
         selectField('Klijent', 'client_id', clients, item.client_id) +
+        `<div class="field"><label for="vehFilter">Pronađi vozilo</label><input id="vehFilter" type="search" placeholder="Registracija ili marka…" autocomplete="off"></div>` +
         selectField('Vozilo', 'vehicle_id', vehicles, item.vehicle_id) +
         field('Kilometraža pri prijemu (km)', 'mileage', item.mileage, 'number') +
         field('Kodovi grešaka (odvojite zarezom)', 'dtc_codes', item.dtc_codes) +
         textArea('Prijavljeni problem', 'complaint', item.complaint) +
+        `<div class="field full"><label for="svcPick">Dodaj uslugu iz cenovnika (upisuje naziv u opis i dodaje cenu u „Naplaćeno“)</label><select id="svcPick"><option value="">— izaberite uslugu —</option>${state.services.slice().sort((a, b) => a.name.localeCompare(b.name, 'sr-Latn')).map(x => `<option value="${x.id}">${esc(x.name)} — ${esc(fmt(x.price_amount))}</option>`).join('')}</select></div>` +
         textArea('Opis izvršenog posla *', 'description', item.description) +
         textArea('Napomena', 'notes', item.notes) +
         `<div class="full moneyFields"><h3>Podsetnik za sledeći servis</h3><div class="formGrid">` +
@@ -598,11 +630,14 @@ function orderForm(item = {}) {
         return send('/orders' + (item.id ? '/' + item.id : ''), item.id ? 'PUT' : 'POST', b);
     });
 
-    $('#f_client_id').onchange = e => {
-        let options = state.vehicles.filter(v => v.client_id === +e.target.value);
+    const fillVehicles = () => {
+        const wanted = $('#f_vehicle_id').value, text = $('#vehFilter').value.trim().toLowerCase(), clientId = +$('#f_client_id').value;
+        const options = state.vehicles.filter(v => (!clientId || v.client_id === clientId) && (!text || formatVehicle(v).toLowerCase().includes(text) || String(v.vin || '').toLowerCase().includes(text)));
         $('#f_vehicle_id').innerHTML = '<option value="">Izaberite vozilo</option>' +
-            options.map(v => `<option value="${v.id}">${esc(formatVehicle(v))}</option>`).join('');
+            options.map(v => `<option value="${v.id}" ${String(v.id) === wanted ? 'selected' : ''}>${esc(formatVehicle(v))}</option>`).join('');
     };
+    $('#f_client_id').onchange = fillVehicles;
+    $('#vehFilter').oninput = fillVehicles;
 
     $('#f_vehicle_id').onchange = e => {
         const v = state.vehicles.find(x => x.id === +e.target.value);
@@ -615,6 +650,16 @@ function orderForm(item = {}) {
 
     $('#f_spent_amount').oninput = update;
     $('#f_charged_amount').oninput = update;
+
+    $('#svcPick').onchange = e => {
+        const svc = state.services.find(x => x.id === +e.target.value);
+        if (!svc) return;
+        const desc = document.querySelector('textarea[name=description]');
+        desc.value = (desc.value.trim() ? desc.value.replace(/\s+$/, '') + '\n' : '') + '• ' + svc.name;
+        $('#f_charged_amount').value = (Number($('#f_charged_amount').value || 0) + (Number(svc.price_amount) || 0) / 100).toFixed(2);
+        update();
+        e.target.value = '';
+    };
 }
 
 async function viewOrder(id) {
@@ -625,7 +670,7 @@ async function viewOrder(id) {
         modal('Radni nalog ' + o.order_number,
             `<div class="summaryRow">` +
             `<div><span class="muted">Datum</span><h3>${esc(fd(o.date))}</h3></div>` +
-            `<div><span class="muted">Klijent</span><h3>${esc(o.client_name)}</h3></div>` +
+            `<div><span class="muted">Klijent</span><h3>${esc(o.client_name)}</h3>${o.client_phone ? `<small>${telLink(o.client_phone)}</small>` : ''}</div>` +
             `<div><span class="muted">Vozilo</span><h3>${esc(formatVehicle(o.vehicle_name))}</h3></div>` +
             `<div><span class="muted">Status</span><select id="quickStatus">${Object.entries(STATUS).map(([k, [l]]) => `<option value="${k}" ${o.status === k ? 'selected' : ''}>${l}</option>`).join('')}</select></div>` +
             `</div>` +
@@ -646,6 +691,7 @@ async function viewOrder(id) {
             `<div class="formActions">` +
             `<button class="danger" id="deleteOrder">Obriši nalog</button>` +
             `<button class="secondary" id="orderPdf">PDF nalog</button>` +
+            `<button class="secondary" id="dupOrder">Dupliraj</button>` +
             `<button class="secondary" id="editOrder">Izmeni nalog</button>` +
             `<button class="primary" id="doneOrder">Zatvori</button></div>`
         );
@@ -661,7 +707,7 @@ async function viewOrder(id) {
                     let url = URL.createObjectURL(blob);
                     img.src = url;
                     img.onload = () => URL.revokeObjectURL(url);
-                } catch (e) {}
+                } catch (e) { img.alt = 'Fotografija nije dostupna'; }
             });
 
             document.querySelectorAll('[data-removephoto]').forEach(b => b.onclick = async () => {
@@ -683,7 +729,7 @@ async function viewOrder(id) {
                 await send('/orders/' + id + '/status', 'PATCH', { status: e.target.value });
                 o.status = e.target.value;
                 toast('Status promenjen.');
-                navigate(state.page);
+                refresh();
             } catch (err) {
                 toast(err.message);
             }
@@ -696,12 +742,17 @@ async function viewOrder(id) {
             if (!files.length) return toast('Izaberite fotografije.');
             let form = new FormData();
             for (let f of files) form.append('photos', f);
+            const btn = $('#uploadPhotos');
+            btn.disabled = true;
+            btn.textContent = 'Slanje…';
             try {
                 await api('/orders/' + id + '/photos', { method: 'POST', body: form });
                 toast('Fotografije su sačuvane.');
                 viewOrder(id);
             } catch (e) {
                 toast(e.message);
+                btn.disabled = false;
+                btn.textContent = 'Dodaj fotografije';
             }
         };
 
@@ -710,13 +761,14 @@ async function viewOrder(id) {
             try {
                 await api('/orders/' + id, { method: 'DELETE' });
                 closeModal();
-                navigate(state.page);
+                refresh();
             } catch (e) {
                 toast(e.message);
             }
         };
 
         $('#editOrder').onclick = () => orderForm(o);
+        $('#dupOrder').onclick = () => orderForm({ ...o, id: undefined, order_number: undefined, date: today(), status: 'done', mileage: null, complaint: '', dtc_codes: '', next_service_date: null, next_service_km: null });
         $('#doneOrder').onclick = closeModal;
     } catch (e) {
         toast(e.message);
@@ -747,6 +799,7 @@ async function statsPage(range = null) {
 
     let q = '?from=' + range.from + '&to=' + range.to,
         s = await api('/stats' + q);
+    state.firstDate = s.firstDate || '';
         
     $('#content').innerHTML = 
         `<div class="panel"><h3>Izaberite period</h3>${dateControls(null, state.period)}</div>` +
@@ -762,11 +815,12 @@ async function statsPage(range = null) {
         `<section class="panel"><h3>Najčešće servisirane marke</h3>${ranking(s.makes)}</section>` +
         `<section class="panel"><h3>Najaktivniji klijenti</h3>${ranking(s.active)}</section>` +
         `</div>` +
+        `<section class="panel"><h3>Najčešći kodovi grešaka</h3>${ranking(s.dtc)}</section>` +
         `<div class="toolbar"><span class="subtle">Izveštaj za period ${fd(range.from)} – ${fd(range.to)}</span>` +
         `<div class="filters"><button class="secondary" id="exportCsv">Izvoz CSV</button><button class="primary" id="exportPdf">Izvoz PDF</button></div></div>`;
         
     wirePeriod(statsPage);
-    $('#exportCsv').onclick = () => download('/export.csv' + q, 'autodesk-report.csv');
+    $('#exportCsv').onclick = () => download('/export.csv' + q, 'autodesk-izvestaj.csv');
     $('#exportPdf').onclick = () => download('/export.pdf' + q, 'autodesk-izvestaj.pdf');
 }
 
@@ -796,9 +850,10 @@ async function settingsPage() {
         `<section class="panel"><h3>Podaci radionice</h3>` +
         `<p class="subtle">Promena između RSD i EUR preračunava sve radne naloge i cene usluga po fiksnom kursu 1 EUR = 120 RSD. Iznosi se zaokružuju na dve decimale. Ostale valute nisu dostupne za konverziju bez definisanog kursa.</p>` +
         `<form id="settingsForm"><div class="formGrid">` +
-        field('Naziv radionice', 'workshop_name', s.workshop_name || 'AutoDesk') +
+        field('Naziv radionice', 'workshop_name', s.workshop_name || 'Auto Dijagnostika Lazarević') +
         `<div class="field"><label for="f_currency">Valuta</label><select id="f_currency" name="currency">${['RSD', 'EUR'].map(c => `<option value="${c}" ${c === (s.currency || 'RSD') ? 'selected' : ''}>${c}</option>`).join('')}</select></div>` +
         `<div class="field"><label for="f_date_format">Format datuma</label><select id="f_date_format" name="date_format">${[['DD.MM.YYYY', '13.11.2026'], ['YYYY-MM-DD', '2026-11-13']].map(([v, l]) => `<option value="${v}" ${v === (s.date_format || 'DD.MM.YYYY') ? 'selected' : ''}>${l}</option>`).join('')}</select></div>` +
+        `<div class="field"><label for="f_backup_days">Čuvanje automatskih kopija</label><select id="f_backup_days" name="backup_days">${[[1, '1 dan'], [7, '7 dana'], [15, '15 dana'], [30, '30 dana']].map(([v, l]) => `<option value="${v}" ${v === (Number(s.backup_days) || 30) ? 'selected' : ''}>${l}</option>`).join('')}</select></div>` +
         textArea('Podaci radionice (adresa, telefon, PIB… – svaki u novom redu, štampa se u zaglavlju PDF-a)', 'workshop_info', s.workshop_info) +
         `</div><div class="formActions"><button class="primary">Sačuvaj podešavanja</button></div></form></section>` +
         `<section class="panel"><h3>Prenos podataka</h3><p class="subtle">Preuzmite kompletnu evidenciju ili uvezite prethodno izvezenu JSON kopiju. Uvoz zamenjuje podatke na svim uređajima.</p><button class="secondary" id="exportAll" type="button">Izvezi JSON</button> <label class="secondary" style="display:inline-block;padding:10px;cursor:pointer">Uvezi JSON<input type="file" id="importAll" accept=".json,application/json" hidden></label></section>` +
@@ -808,9 +863,9 @@ async function settingsPage() {
         field('Ponovite novu lozinku', 'next2', '', 'password', true) +
         `</div><div class="formActions"><button class="primary">Promeni lozinku</button></div></form></section>` +
         `<section class="panel"><h3>Rezervne kopije</h3>` +
-        `<p class="subtle">Rezervne kopije se čuvaju u Firebase evidenciji. Redovno preuzimajte i privatnu kopiju podataka.</p>` +
+        `<p class="subtle">Automatska kopija se pravi jednom dnevno, pri prvom otvaranju aplikacije (čuvaju se onoliko dana koliko izaberete iznad, podrazumevano 30). Ručne kopije se čuvaju do 30 komada. Kopije ne sadrže fotografije; za potpunu privatnu kopiju koristite „Izvezi JSON“ iznad.</p>` +
         `<button class="primary" id="backupNow">+ Napravi rezervnu kopiju</button>` +
-        `<div id="backupsList" style="margin-top:20px">${backups.map(n => `<div class="toolbar"><span>${esc(n)}</span><button class="secondary" data-backup="${esc(n)}">Preuzmi</button></div>`).join('') || '<p class="muted">Nema rezervnih kopija.</p>'}</div>` +
+        `<div id="backupsList" style="margin-top:20px">${backups.map(b => `<div class="toolbar"><span>${esc(new Date(b.ts).toLocaleString('sr-Latn-RS', { dateStyle: 'medium', timeStyle: 'short' }))} <small class="muted">· ${b.kind === 'auto' ? 'automatska' : b.kind === 'pre-restore' ? 'pre vraćanja' : 'ručna'}</small></span><span style="display:flex;gap:8px;flex-wrap:wrap"><button class="secondary" data-backup="${esc(b.name)}">Preuzmi</button><button class="secondary" data-restore="${esc(b.name)}">Vrati</button><button class="danger" data-delbackup="${esc(b.name)}">Obriši</button></span></div>`).join('') || '<p class="muted">Nema rezervnih kopija.</p>'}</div>` +
         `<p class="notice">Sačuvajte preuzetu kopiju na bezbednom mestu. Uvoz kompletne evidencije zamenjuje podatke u oblaku.</p></section>` +
         `<section class="panel"><h3>Mrežni pristup i čuvanje podataka</h3>` +
         `<p class="subtle">Aplikacija je objavljena na GitHub Pages, a podaci se sinhronizuju preko Firebase Firestore baze. Za sinhronizaciju je potreban internet.</p></section>`;
@@ -859,15 +914,36 @@ async function settingsPage() {
         }
     };
     
-    document.querySelectorAll('[data-backup]').forEach(b => b.onclick = () => download('/backups/' + encodeURIComponent(b.dataset.backup), b.dataset.backup));
+    document.querySelectorAll('[data-backup]').forEach(b => b.onclick = () => download('/backups/' + encodeURIComponent(b.dataset.backup), b.dataset.backup + '.json'));
+    document.querySelectorAll('[data-restore]').forEach(b => b.onclick = async () => {
+        if (!confirm('Vratiti evidenciju iz ove kopije? Trenutno stanje se prvo čuva kao kopija „pre vraćanja“.')) return;
+        try {
+            await send('/backups/restore', 'POST', { name: b.dataset.restore });
+            toast('Evidencija je vraćena iz kopije.');
+            await navigate('dashboard');
+        } catch (e) { toast(e.message); }
+    });
+    document.querySelectorAll('[data-delbackup]').forEach(b => b.onclick = async () => {
+        if (!confirm('Obrisati ovu rezervnu kopiju?')) return;
+        try { await api('/backups/' + encodeURIComponent(b.dataset.delbackup), { method: 'DELETE' }); settingsPage(); } catch (e) { toast(e.message); }
+    });
 }
 
 function loginScreen() {
-    document.body.innerHTML = `<div class="loginWrap"><div class="loginBox"><div class="brand"><div><strong>Auto Dijagnostika Lazarević</strong><small>Kontrolna tabla</small></div></div><h2>Prijava</h2><p>Prijavite se svojim Firebase nalogom.</p><form id="loginForm"><div class="field"><label>Email</label><input id="email" type="email" required autocomplete="username"></div><div class="field"><label>Lozinka</label><input id="password" type="password" required autocomplete="current-password"></div><button class="primary">Prijavi se</button></form><p><button type="button" class="secondary" id="verifyOwner">Pošalji potvrdu emaila</button></p><p id="loginError" style="color:var(--red)"></p></div></div>`;
-    if(!CloudSync.ready) $('#loginError').textContent='Prvo popunite firebase-config.js prema UPUTSTVO.md.';
-    $('#email').value='';
-    $('#verifyOwner').onclick=async()=>{try{await CloudSync.resend($('#email').value.trim(),$('#password').value);$('#loginError').textContent='Poslat je email za potvrdu.';}catch(e){$('#loginError').textContent=e.message;}};
-    $('#loginForm').onsubmit=async e=>{e.preventDefault();try{await CloudSync.login($('#email').value.trim(),$('#password').value);location.reload();}catch(err){$('#loginError').textContent=err.message;}};
+    document.body.innerHTML = `<div class="loginWrap"><div class="loginBox"><div class="brand"><img class="brandLogo" src="./slike/logo.png" alt=""><div><strong>Auto Dijagnostika Lazarević</strong><small>Evidencija</small></div></div><h2>Prijava</h2><p>Prijavite se svojim nalogom.</p><form id="loginForm"><div class="field"><label>Email</label><input id="email" type="email" required autocomplete="username"></div><div class="field"><label>Lozinka</label><input id="password" type="password" required autocomplete="current-password"></div><button class="primary">Prijavi se</button></form><p><button type="button" class="secondary" id="resetPw">Zaboravljena lozinka?</button></p><p id="loginError" style="color:var(--red)"></p></div></div>`;
+    if (!CloudSync.ready) $('#loginError').textContent = 'Firebase nije dostupan. Proverite internet vezu i osvežite stranicu.';
+    $('#resetPw').onclick = async () => {
+        try {
+            await CloudSync.resetPassword($('#email').value.trim());
+            $('#loginError').style.color = 'var(--green)';
+            $('#loginError').textContent = 'Poslat je email za postavljanje nove lozinke.';
+        } catch (e) { $('#loginError').style.color = 'var(--red)'; $('#loginError').textContent = e.message; }
+    };
+    $('#loginForm').onsubmit = async e => {
+        e.preventDefault();
+        try { await CloudSync.login($('#email').value.trim(), $('#password').value); location.reload(); }
+        catch (err) { $('#loginError').style.color = 'var(--red)'; $('#loginError').textContent = err.message; }
+    };
 }
 
 async function init() {
@@ -877,19 +953,11 @@ async function init() {
         return;
     }
     const updateDateTime = () => {
-    $('#today').textContent = new Date().toLocaleString('sr-Latn-RS', {
-        day: 'numeric',
-        month: 'long',
-        year: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
-        second: '2-digit'
-    });
-};
+        $('#today').textContent = new Date().toLocaleString('sr-Latn-RS', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+    };
+    updateDateTime();
+    setInterval(updateDateTime, 30000);
 
-updateDateTime();
-setInterval(updateDateTime, 1000);
-    
     $('#quickOrder').onclick = async () => {
         try {
             await loadBase();
@@ -901,7 +969,6 @@ setInterval(updateDateTime, 1000);
     
     $('#logout').onclick = async () => {
         await CloudSync.logout();
-        sessionStorage.removeItem('autodesk_token');
         location.reload();
     };
     
@@ -917,21 +984,22 @@ setInterval(updateDateTime, 1000);
     menuBtn.onclick = () => setMenuOpen(!sidebar.classList.contains('open'));
     menuBackdrop.onclick = () => setMenuOpen(false);
     document.addEventListener('keydown', e => {
-        if (e.key === 'Escape' && sidebar.classList.contains('open')) setMenuOpen(false);
+        if (e.key !== 'Escape') return;
+        if (!$('#modal').classList.contains('hidden')) closeModal();
+        else if (sidebar.classList.contains('open')) setMenuOpen(false);
     });
+    $('#modal').onclick = e => { if (e.target.id === 'modal') closeModal(); };
     await navigate('dashboard');
     
     if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js').catch(() => {});
     
-    setInterval(async () => {
-        try {
-            await api('/health');
-            $('#serverDot').style.color = '#35C879';
-        } catch (e) {
-            $('#serverDot').style.color = '#E34B4B';
-            toast('Sinhronizacija nije dostupna. Proverite internet vezu.');
-        }
-    }, 60000);
+    LocalAPI.autoBackup().catch(e => console.warn('Automatska kopija nije napravljena:', e.message));
+
+    // Povremena provera oblaka (jedno čitanje) i prikaz stanja veze.
+    setInterval(async () => { try { await api('/settings'); } catch (e) { /* stanje se prikazuje ispod */ } syncStatus(); }, 60000);
+    document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible') LocalAPI.refresh().then(syncStatus, syncStatus);
+    });
 }
 
 init();
