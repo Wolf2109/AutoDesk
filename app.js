@@ -334,35 +334,6 @@ function entityRows(type, rows) {
     }).join('');
 }
 
-function orderMonthOptions(selected = '') {
-    const current = new Date();
-    const options = [];
-
-    for (let y = current.getFullYear(); y >= 2020; y--) {
-        const lastMonth = y === current.getFullYear()
-            ? current.getMonth()
-            : 11;
-
-        for (let m = lastMonth; m >= 0; m--) {
-            const value = `${y}-${String(m + 1).padStart(2, '0')}`;
-
-            const label = new Intl.DateTimeFormat('sr-RS', {
-                month: 'long'
-            }).format(new Date(y, m, 1));
-
-            const name = label.charAt(0).toLocaleUpperCase('sr-RS')
-                + label.slice(1);
-
-            options.push(
-                `<option value="${value}" ${selected === value ? 'selected' : ''}>
-                    ${name} ${y}
-                </option>`
-            );
-        }
-    }
-
-    return options.join('');
-}
 async function listPage(type, params = {}) {
     let isOrder = type === 'orders',
         name = type === 'clients' ? 'klijenta' : type === 'vehicles' ? 'vozilo' : type === 'services' ? 'uslugu' : 'radni nalog';
@@ -373,72 +344,23 @@ async function listPage(type, params = {}) {
     let rows = await api(url + (query.size ? '?' + query : ''));
     state[type] = rows;
 
-    let hasActiveFilters = isOrder && (
-    params.from ||
-    params.to ||
-    params.client_id ||
-    params.vehicle_id
-);
-
-let selectedOrderMonth = '';
-
-if (params.from && params.to) {
-    const fromMonth = params.from.slice(0, 7);
-    const toMonth = params.to.slice(0, 7);
-
-    if (fromMonth === toMonth) {
-        const [year, month] = fromMonth.split('-').map(Number);
-        const lastDay = new Date(year, month, 0).getDate();
-
-        if (
-            params.from.endsWith('-01') &&
-            Number(params.to.slice(8, 10)) === lastDay
-        ) {
-            selectedOrderMonth = fromMonth;
-        }
-    }
-}
+    let hasActiveFilters = isOrder && (params.from || params.to || params.client_id || params.vehicle_id || params.status);
+    
     let clientsOptions = state.clients.map(c => `<option value="${c.id}" ${String(params.client_id) === String(c.id) ? 'selected' : ''}>${esc(c.name)}</option>`).join('');
     let vehiclesOptions = state.vehicles.map(v => `<option value="${v.id}" ${String(params.vehicle_id) === String(v.id) ? 'selected' : ''}>${esc(formatVehicle(v))}</option>`).join('');
 
     let filtersHtml = isOrder ? `
-    <div class="panel" id="filtersPanel"
-         style="display: ${hasActiveFilters ? 'block' : 'none'}; margin-bottom: 16px;">
-
-        <div class="filters">
-
-            <select id="orderMonth" style="min-width:180px">
-                <option value="">Svi meseci</option>
-                ${orderMonthOptions(selectedOrderMonth)}
-            </select>
-
-            <input type="date" id="orderFrom"
-                   value="${esc(params.from || '')}">
-
-            <input type="date" id="orderTo"
-                   value="${esc(params.to || '')}">
-
-            <select id="orderClient">
-                <option value="">Svi klijenti</option>
-                ${clientsOptions}
-            </select>
-
-            <select id="orderVehicle">
-                <option value="">Sva vozila</option>
-                ${vehiclesOptions}
-            </select>
-
-            <button class="secondary" id="filterOrders">
-                Filtriraj
-            </button>
-
-            <button class="ghost" id="resetOrders">
-                Poništi
-            </button>
-
-        </div>
-    </div>
-` : '';
+        <div class="panel" id="filtersPanel" style="display: ${hasActiveFilters ? 'block' : 'none'}; margin-bottom: 16px;">
+            <div class="filters">
+                <input type="date" id="orderFrom" value="${esc(params.from || '')}">
+                <input type="date" id="orderTo" value="${esc(params.to || '')}">
+                <select id="orderClient"><option value="">Svi klijenti</option>${clientsOptions}</select>
+                <select id="orderVehicle"><option value="">Sva vozila</option>${vehiclesOptions}</select>
+                <select id="orderStatus"><option value="">Svi statusi</option><option value="active" ${params.status === 'active' ? 'selected' : ''}>Nalozi u toku</option>${Object.entries(STATUS).map(([k, [l]]) => `<option value="${k}" ${params.status === k ? 'selected' : ''}>${l}</option>`).join('')}</select>
+                <button class="secondary" id="filterOrders">Filtriraj</button>
+                <button class="ghost" id="resetOrders">Poništi</button>
+            </div>
+        </div>` : '';
 
     let searchValue = params.search || '';
 
@@ -510,28 +432,6 @@ if (params.from && params.to) {
 
         if (isOrder) {
             wireOrderViews();
-            const orderMonth = $('#orderMonth');
-
-orderMonth.onchange = () => {
-    if (!orderMonth.value) {
-        $('#orderFrom').value = '';
-        $('#orderTo').value = '';
-        return;
-    }
-
-    const [year, month] = orderMonth.value.split('-').map(Number);
-
-    const firstDay =
-        `${year}-${String(month).padStart(2, '0')}-01`;
-
-    const lastDayNumber = new Date(year, month, 0).getDate();
-
-    const lastDay =
-        `${year}-${String(month).padStart(2, '0')}-${String(lastDayNumber).padStart(2, '0')}`;
-
-    $('#orderFrom').value = firstDay;
-    $('#orderTo').value = lastDay;
-};
         } else {
             document.querySelectorAll('[data-edit]').forEach(b => b.onclick = () => entityForm(type, rows.find(x => x.id === +b.dataset.edit)));
             document.querySelectorAll('[data-delete]').forEach(b => b.onclick = () => removeEntity(type, +b.dataset.delete));
