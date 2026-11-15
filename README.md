@@ -31,7 +31,7 @@ Web aplikacija za evidenciju radnih naloga, vozila i klijenata auto radionice. R
 - Otvaraju se u novoj kartici; „Štampaj / Sačuvaj kao PDF“
 
 **Podaci i bezbednost**
-- Rezervne kopije: automatska jednom dnevno (čuva se 1, 7, 15 ili 30 dana, podrazumevano 30), ručne do 30 komada, preuzimanje, vraćanje i brisanje
+- Rezervne kopije: automatska na svakih 1, 7, 15 ili 30 dana (podrazumevano 30; čuva se poslednjih 10), ručne do 30 komada, preuzimanje, vraćanje i brisanje
 - Izvoz i uvoz cele evidencije u JSON (sa fotografijama)
 - Provera verzije pri svakoj izmeni, pa dva uređaja ne mogu tiho da prepišu jedan drugom izmene
 - Pregled poslednjih sačuvanih podataka bez interneta (izmene zahtevaju vezu)

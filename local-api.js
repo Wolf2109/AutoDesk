@@ -288,10 +288,8 @@ const LocalAPI = (() => {
   async function pruneBackups() {
     const all = await CloudSync.listBackups();
     const autos = all.filter(b => b.kind === 'auto'), others = all.filter(b => b.kind !== 'auto');
-    const days = Number(snapshot?.settings?.backup_days) || 30, cutoff = Date.now() - days * 86400000;
-    // Automatske kopije starije od izabranog broja dana se brišu (najnovija ostaje uvek).
-    const expired = autos.slice(1).filter(b => b.ts < cutoff);
-    for (const b of [...expired, ...others.slice(30)]) await CloudSync.deleteBackup(b.name).catch(() => {});
+    // Čuva se poslednjih 10 automatskih i 30 ručnih kopija.
+    for (const b of [...autos.slice(10), ...others.slice(30)]) await CloudSync.deleteBackup(b.name).catch(() => {});
   }
   async function makeBackup(kind = 'manual') {
     const s = await read(true), name = backupName(kind);
@@ -299,11 +297,13 @@ const LocalAPI = (() => {
     await pruneBackups().catch(() => {});
     return name;
   }
+  /** Pravi automatsku kopiju ako je od poslednje prošlo izabrani broj dana (1, 7, 15 ili 30). */
   async function autoBackup() {
-    const name = backupName('auto');
-    if ((await CloudSync.listBackups()).some(b => b.name === name)) return null;
-    await makeBackup('auto');
-    return name;
+    const st = await read(), days = BACKUP_DAYS.includes(Number(st.settings.backup_days)) ? Number(st.settings.backup_days) : 30;
+    const last = (await CloudSync.listBackups()).find(b => b.kind === 'auto');
+    // Tolerancija od 6 sati: otvaranje aplikacije malo ranije u danu ne odlaže kopiju za ceo dan.
+    if (last && Date.now() - last.ts < days * 86400000 - 6 * 3600000) return null;
+    return makeBackup('auto');
   }
 
   async function replaceAll(parsed) {
@@ -360,7 +360,6 @@ const LocalAPI = (() => {
       if (['DD.MM.YYYY', 'YYYY-MM-DD'].includes(body.date_format)) s.settings.date_format = body.date_format;
       if (BACKUP_DAYS.includes(Number(body.backup_days))) s.settings.backup_days = Number(body.backup_days);
       const result = await save({ ok: true, currency, converted: currency !== old });
-      await pruneBackups().catch(() => {});
       return result;
     }
 

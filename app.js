@@ -79,9 +79,12 @@ const STATUS = {
 const telLink = p => `<a class="telLink" href="tel:${esc(String(p).replace(/[^\d+]/g, ''))}">${esc(p)}</a>`;
 const badge = s => `<span class="badge ${STATUS[s]?.[1] || 'muted'}">${STATUS[s]?.[0] || ''}</span>`;
 
+const friendlyError = m => /insufficient permissions|permission-denied/i.test(String(m))
+    ? 'Firestore pravila ne dozvoljavaju pristup ovoj kolekciji. U Firebase konzoli (Firestore Database → Rules) objavite pravila iz fajla firestore.rules.'
+    : m;
 const toast = m => {
     let el = $('#toast');
-    el.textContent = m;
+    el.textContent = friendlyError(m);
     el.style.display = 'block';
     clearTimeout(window.toastTimer);
     window.toastTimer = setTimeout(() => el.style.display = 'none', 4200);
@@ -844,7 +847,8 @@ async function download(url, name) {
 }
 
 async function settingsPage() {
-    let [s, backups] = await Promise.all([api('/settings'), api('/backups')]);
+    let backupsError = '';
+    let [s, backups] = await Promise.all([api('/settings'), api('/backups').catch(e => { backupsError = e.message; return []; })]);
     
     $('#content').innerHTML = 
         `<section class="panel"><h3>Podaci radionice</h3>` +
@@ -853,7 +857,7 @@ async function settingsPage() {
         field('Naziv radionice', 'workshop_name', s.workshop_name || 'Auto Dijagnostika Lazarević') +
         `<div class="field"><label for="f_currency">Valuta</label><select id="f_currency" name="currency">${['RSD', 'EUR'].map(c => `<option value="${c}" ${c === (s.currency || 'RSD') ? 'selected' : ''}>${c}</option>`).join('')}</select></div>` +
         `<div class="field"><label for="f_date_format">Format datuma</label><select id="f_date_format" name="date_format">${[['DD.MM.YYYY', '13.11.2026'], ['YYYY-MM-DD', '2026-11-13']].map(([v, l]) => `<option value="${v}" ${v === (s.date_format || 'DD.MM.YYYY') ? 'selected' : ''}>${l}</option>`).join('')}</select></div>` +
-        `<div class="field"><label for="f_backup_days">Čuvanje automatskih kopija</label><select id="f_backup_days" name="backup_days">${[[1, '1 dan'], [7, '7 dana'], [15, '15 dana'], [30, '30 dana']].map(([v, l]) => `<option value="${v}" ${v === (Number(s.backup_days) || 30) ? 'selected' : ''}>${l}</option>`).join('')}</select></div>` +
+        `<div class="field"><label for="f_backup_days">Automatska rezervna kopija na svakih</label><select id="f_backup_days" name="backup_days">${[[1, '1 dan'], [7, '7 dana'], [15, '15 dana'], [30, '30 dana']].map(([v, l]) => `<option value="${v}" ${v === (Number(s.backup_days) || 30) ? 'selected' : ''}>${l}</option>`).join('')}</select></div>` +
         textArea('Podaci radionice (adresa, telefon, PIB… – svaki u novom redu, štampa se u zaglavlju PDF-a)', 'workshop_info', s.workshop_info) +
         `</div><div class="formActions"><button class="primary">Sačuvaj podešavanja</button></div></form></section>` +
         `<section class="panel"><h3>Prenos podataka</h3><p class="subtle">Preuzmite kompletnu evidenciju ili uvezite prethodno izvezenu JSON kopiju. Uvoz zamenjuje podatke na svim uređajima.</p><button class="secondary" id="exportAll" type="button">Izvezi JSON</button> <label class="secondary" style="display:inline-block;padding:10px;cursor:pointer">Uvezi JSON<input type="file" id="importAll" accept=".json,application/json" hidden></label></section>` +
@@ -863,7 +867,8 @@ async function settingsPage() {
         field('Ponovite novu lozinku', 'next2', '', 'password', true) +
         `</div><div class="formActions"><button class="primary">Promeni lozinku</button></div></form></section>` +
         `<section class="panel"><h3>Rezervne kopije</h3>` +
-        `<p class="subtle">Automatska kopija se pravi jednom dnevno, pri prvom otvaranju aplikacije (čuvaju se onoliko dana koliko izaberete iznad, podrazumevano 30). Ručne kopije se čuvaju do 30 komada. Kopije ne sadrže fotografije; za potpunu privatnu kopiju koristite „Izvezi JSON“ iznad.</p>` +
+        (backupsError ? `<p class="notice">Rezervne kopije nisu dostupne: ${esc(friendlyError(backupsError))}</p>` : '') +
+        `<p class="subtle">Automatska kopija se pravi pri otvaranju aplikacije kada od poslednje prođe izabrani broj dana (podrazumevano 30). Čuva se poslednjih 10 automatskih i do 30 ručnih kopija. Kopije ne sadrže fotografije; za potpunu privatnu kopiju koristite „Izvezi JSON“ iznad.</p>` +
         `<button class="primary" id="backupNow">+ Napravi rezervnu kopiju</button>` +
         `<div id="backupsList" style="margin-top:20px">${backups.map(b => `<div class="toolbar"><span>${esc(new Date(b.ts).toLocaleString('sr-Latn-RS', { dateStyle: 'medium', timeStyle: 'short' }))} <small class="muted">· ${b.kind === 'auto' ? 'automatska' : b.kind === 'pre-restore' ? 'pre vraćanja' : 'ručna'}</small></span><span style="display:flex;gap:8px;flex-wrap:wrap"><button class="secondary" data-backup="${esc(b.name)}">Preuzmi</button><button class="secondary" data-restore="${esc(b.name)}">Vrati</button><button class="danger" data-delbackup="${esc(b.name)}">Obriši</button></span></div>`).join('') || '<p class="muted">Nema rezervnih kopija.</p>'}</div>` +
         `<p class="notice">Sačuvajte preuzetu kopiju na bezbednom mestu. Uvoz kompletne evidencije zamenjuje podatke u oblaku.</p></section>` +
