@@ -1,5 +1,5 @@
 'use strict';
-const CACHE = 'autodesk-ui-20261115-v3';
+const CACHE = 'autodesk-ui-20261116-v4';
 const FILES = ['./', './index.html', './style.css', './app.js', './print-docs.js', './local-api.js', './cloud-sync.js', './manifest.json', './favicon.ico', './slike/logo.png', './icons/icon-192.png', './icons/icon-512.png'];
 const SDK = 'https://www.gstatic.com/firebasejs/';
 

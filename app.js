@@ -34,8 +34,94 @@ const state = {
     currency: 'RSD',
     dateFormat: 'DD.MM.YYYY',
     ordersParams: {},
-    firstDate: ''
+    firstDate: '',
+    renderedPage: null
 };
+
+/* ---------- Učitavanje (splash i indikatori) ---------- */
+const loaderHtml = (text = 'Učitavam podatke…') =>
+    `<div class="loader" role="status"><div class="spinner" aria-hidden="true"></div><p>${text}</p></div>`;
+
+function setBoot(text) {
+    const t = $('#bootText');
+    if (t) t.textContent = text;
+}
+
+function clearBootTimers() {
+    (window.__bootTimers || []).forEach(clearTimeout);
+    window.__bootTimers = [];
+}
+
+function hideBoot() {
+    clearBootTimers();
+    const b = $('#boot');
+    if (!b) return;
+    b.classList.add('done');
+    setTimeout(() => b.remove(), 350);
+}
+
+function bootFail(e) {
+    console.error(e);
+    clearBootTimers();
+    const b = $('#boot');
+    if (!b) return;
+    b.querySelector('.spinner')?.classList.add('hidden');
+    setBoot('Aplikacija nije mogla da se pokrene.');
+    const hint = $('#bootHint');
+    if (hint) hint.textContent = e?.message || '';
+    $('#bootRetry')?.classList.remove('hidden');
+}
+
+/* ---------- Dugme „nazad“ (istorija pregledača) ----------
+ * Svaka stranica, otvoren prozor (modal) i otvoren meni dobijaju svoj unos u istoriji,
+ * pa „nazad“ na telefonu zatvara prozor/meni ili vraća na prethodnu stranicu umesto da izađe iz aplikacije.
+ */
+const ui = { menu: false, modal: false, ignorePop: 0, backDone: null, backResolve: null };
+
+function historyBack() {
+    ui.ignorePop++;
+    ui.backDone = new Promise(resolve => {
+        const finish = timedOut => {
+            clearTimeout(timer);
+            if (timedOut && ui.ignorePop > 0) ui.ignorePop--;
+            ui.backDone = null;
+            ui.backResolve = null;
+            resolve();
+        };
+        const timer = setTimeout(() => finish(true), 500);
+        ui.backResolve = () => finish(false);
+    });
+    history.back();
+}
+
+function pushPage(page) {
+    const cur = history.state || {};
+    if (cur.menu) history.replaceState({ page }, '');       // izbor u meniju zamenjuje unos menija
+    else if (cur.page !== page) history.pushState({ page }, '');
+}
+
+function setMenuOpen(open, fromPop = false) {
+    $('#sidebar')?.classList.toggle('open', open);
+    $('#menuBackdrop')?.classList.toggle('visible', open);
+    const btn = $('#menuBtn');
+    btn?.setAttribute('aria-expanded', String(open));
+    btn?.setAttribute('aria-label', open ? 'Sakrij meni' : 'Prikaži meni');
+    if (open && !ui.menu) {
+        history.pushState({ ...(history.state || {}), menu: true }, '');
+        ui.menu = true;
+    } else if (!open && ui.menu) {
+        ui.menu = false;
+        if (!fromPop) historyBack();
+    }
+}
+
+function onPopState(e) {
+    if (ui.ignorePop > 0) { ui.ignorePop--; ui.backResolve?.(); return; }
+    if (ui.modal) { closeModal(true); return; }
+    if (ui.menu) { setMenuOpen(false, true); return; }
+    const page = e.state?.page;
+    if (page && page !== state.page) navigate(page, true, true);
+}
 
 const navItems = [
     ['dashboard', '<svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9" rx="2"/><rect x="14" y="3" width="7" height="5" rx="2"/><rect x="14" y="12" width="7" height="9" rx="2"/><rect x="3" y="16" width="7" height="5" rx="2"/></svg>', 'Dashboard'],
@@ -124,14 +210,25 @@ function syncStatus() {
     }
 }
 
-async function navigate(page, keep = false) {
+let navSeq = 0;
+
+async function navigate(page, keep = false, fromPop = false) {
+    const seq = ++navSeq;
+    if (ui.backDone) await ui.backDone;            // sačekaj da se završi „nazad“ koji je zatvorio prozor
+    if (!fromPop && !keep) pushPage(page);
     state.page = page;
+    ui.menu = false;
     $('#sidebar')?.classList.remove('open');
     $('#menuBackdrop')?.classList.remove('visible');
     $('#menuBtn')?.setAttribute('aria-expanded', 'false');
     $('#menuBtn')?.setAttribute('aria-label', 'Prikaži meni');
     renderNav();
     $('#pageTitle').textContent = navItems.find(x => x[0] === page)?.[2] || 'AutoDesk';
+
+    // Prazna ili druga stranica: prikaži učitavanje; ista stranica ostaje vidljiva uz traku na vrhu.
+    const content = $('#content');
+    if (state.renderedPage !== page || !content.firstElementChild) content.innerHTML = loaderHtml();
+    document.body.classList.add('busy');
 
     try {
         let settings = await api('/settings');
@@ -140,16 +237,23 @@ async function navigate(page, keep = false) {
         const brand = document.querySelector('#sidebar .brand strong');
         if (brand && settings.workshop_name) brand.textContent = settings.workshop_name;
         await loadBase();
+        if (seq !== navSeq) return;                 // u međuvremenu je otvorena druga stranica
+        setBoot('Priprema prikaza…');
 
         if (page === 'dashboard') await dashboard();
         else if (page === 'orders') await listPage('orders', keep ? state.ordersParams : {});
         else if (['clients', 'vehicles', 'services'].includes(page)) await listPage(page);
         else if (page === 'stats') await statsPage();
         else if (page === 'settings') await settingsPage();
+        if (seq === navSeq) state.renderedPage = page;
     } catch (e) {
+        if (seq !== navSeq) return;
+        state.renderedPage = null;
         toast(e.message);
         $('#content').innerHTML = `<section class="panel"><h3>Podaci nisu dostupni</h3><p class="subtle">${esc(e.message)}</p><button class="primary" id="retryLoad">Pokušaj ponovo</button></section>`;
         $('#retryLoad').onclick = () => navigate(page, keep);
+    } finally {
+        if (seq === navSeq) document.body.classList.remove('busy');
     }
     syncStatus();
 }
@@ -286,16 +390,16 @@ function chart(data) {
 }
 
 function ordersTable(rows) {
-    return `<div class="tableWrap"><table><thead><tr>` +
+    return `<div class="tableWrap cards"><table class="ordersTbl"><thead><tr>` +
         `<th>Nalog</th><th>Klijent / Vozilo</th><th>Opis</th><th>Potrošeno</th><th>Naplaćeno</th><th>Razlika</th><th></th>` +
         `</tr></thead><tbody>${rows.map(o => `<tr>` +
-        `<td><strong>${esc(o.order_number)}</strong><small>${esc(fd(o.date))}</small>${badge(o.status)}</td>` +
-        `<td>${esc(o.client_name)}<small>${esc(formatVehicle(o.vehicle_name))}</small></td>` +
-        `<td>${esc(o.description.length > 85 ? o.description.slice(0, 85) + '…' : o.description)}${o.dtc_codes ? `<small>${esc(o.dtc_codes)}</small>` : ''}</td>` +
-        `<td>${fmt(o.spent_amount)}</td>` +
-        `<td>${fmt(o.charged_amount)}</td>` +
-        `<td class="${o.difference < 0 ? 'negativeText' : 'positiveText'}">${fmt(o.difference)}</td>` +
-        `<td><button class="linkBtn" data-view="${o.id}">Detalji</button></td>` +
+        `<td class="cNum"><strong>${esc(o.order_number)}</strong><small>${esc(fd(o.date))}</small>${badge(o.status)}</td>` +
+        `<td class="cWho">${esc(o.client_name)}<small>${esc(formatVehicle(o.vehicle_name))}</small></td>` +
+        `<td class="cDesc">${esc(o.description.length > 85 ? o.description.slice(0, 85) + '…' : o.description)}${o.dtc_codes ? `<small>${esc(o.dtc_codes)}</small>` : ''}</td>` +
+        `<td class="cSpent" data-label="Potrošeno">${fmt(o.spent_amount)}</td>` +
+        `<td class="cCharged" data-label="Naplaćeno">${fmt(o.charged_amount)}</td>` +
+        `<td class="cDiff ${o.difference < 0 ? 'negativeText' : 'positiveText'}" data-label="Razlika">${fmt(o.difference)}</td>` +
+        `<td class="cAct"><button class="linkBtn" data-view="${o.id}">Detalji</button></td>` +
         `</tr>`).join('')}</tbody></table>${rows.length ? '' : '<div class="empty">Nema radnih naloga.</div>'}</div>`;
 }
 
@@ -348,7 +452,7 @@ async function dashboard() {
         (rem.rows.length ? `<section class="panel"><h3>Podsetnik za servis (${rem.rows.length})</h3><div class="remList">${rem.rows.map(x => reminderRow(x, rem.today)).join('')}</div></section>` : '') +
         `<section class="panel"><h3>Poslednji radni nalozi</h3>${ordersTable(mon.recent)}</section>`;
 
-    $('#refreshDash').onclick = dashboard;
+    $('#refreshDash').onclick = refresh;
     $('#dashboardNew').onclick = () => orderForm();
     wireOrderViews();
 }
@@ -360,13 +464,14 @@ const tableColumns = {
 };
 
 function entityRows(type, rows) {
+    const cols = tableColumns[type];
     return rows.map(x => {
         let vals = type === 'clients' ? [esc(x.name), x.phone ? telLink(x.phone) : '', esc(x.email)] :
                    type === 'vehicles' ? [esc([x.make, x.model].filter(Boolean).join(' ')), esc(state.clients.find(c => c.id === x.client_id)?.name || ''), esc(x.registration), esc(x.vin), x.mileage != null && x.mileage !== '' ? nf(x.mileage) : ''] :
                    [esc(x.name), esc(fmt(x.price_amount))];
 
-        return `<tr>${vals.map(v => `<td>${v}</td>`).join('')}` +
-            `<td><button class="linkBtn" data-edit="${x.id}">Izmeni</button> ` +
+        return `<tr>${vals.map((v, i) => `<td${i === 0 ? ' class="cMain"' : ''} data-label="${cols[i]}">${v}</td>`).join('')}` +
+            `<td class="cAct"><button class="linkBtn" data-edit="${x.id}">Izmeni</button> ` +
             `<button class="linkBtn" data-delete="${x.id}" style="color:var(--red)">Obriši</button>` +
             `${type === 'clients' || type === 'vehicles' ? ` <button class="linkBtn" data-history="${x.id}">Istorija</button>` : ''}` +
             `${type === 'vehicles' ? ` <button class="linkBtn" data-vpdf="${x.id}">PDF</button>` : ''}</td></tr>`;
@@ -475,7 +580,7 @@ async function listPage(type, params = {}) {
         const visible = filtered.slice(0, shown);
         $('#tableContainer').innerHTML = (isOrder ?
             ordersTable(visible) :
-            `<div class="tableWrap"><table><thead><tr>${tableColumns[type].map(h => `<th>${h}</th>`).join('')}</tr></thead><tbody>${entityRows(type, visible)}</tbody></table>${filtered.length ? '' : '<div class="empty">Nema unetih podataka.</div>'}</div>`) +
+            `<div class="tableWrap cards"><table class="entTbl"><thead><tr>${tableColumns[type].map(h => `<th>${h}</th>`).join('')}</tr></thead><tbody>${entityRows(type, visible)}</tbody></table>${filtered.length ? '' : '<div class="empty">Nema unetih podataka.</div>'}</div>`) +
             (filtered.length > shown ? `<div class="loadMore"><button class="secondary" id="showMore">Prikaži još (${filtered.length - shown})</button></div>` : '');
         const more = $('#showMore');
         if (more) more.onclick = () => { shown += 100; renderTable(currentQ, false); };
@@ -528,10 +633,20 @@ function modal(title, body) {
     $('#modalTitle').textContent = title;
     $('#modalBody').innerHTML = body;
     $('#modal').classList.remove('hidden');
+    document.body.classList.add('modalOpen');
+    if (!ui.modal) {
+        history.pushState({ ...(history.state || {}), modal: true }, '');
+        ui.modal = true;
+    }
 }
 
-function closeModal() {
+function closeModal(fromPop) {
     $('#modal').classList.add('hidden');
+    document.body.classList.remove('modalOpen');
+    if (ui.modal) {
+        ui.modal = false;
+        if (fromPop !== true) historyBack();       // ukloni unos prozora iz istorije
+    }
 }
 
 $('#closeModal').onclick = closeModal;
@@ -969,11 +1084,14 @@ function loginScreen() {
 }
 
 async function init() {
+    setBoot('Provera prijave…');
     const current=await CloudSync.waitForAuth();
     if (!current || current.uid!==window.AUTODESK_FIREBASE_CONFIG.ownerUid) {
+        clearBootTimers();
         loginScreen();
         return;
     }
+    setBoot('Učitavanje podataka…');
     const updateDateTime = () => {
         $('#today').textContent = new Date().toLocaleString('sr-Latn-RS', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' });
     };
@@ -997,12 +1115,6 @@ async function init() {
     const menuBtn = $('#menuBtn');
     const sidebar = $('#sidebar');
     const menuBackdrop = $('#menuBackdrop');
-    const setMenuOpen = open => {
-        sidebar.classList.toggle('open', open);
-        menuBackdrop.classList.toggle('visible', open);
-        menuBtn.setAttribute('aria-expanded', String(open));
-        menuBtn.setAttribute('aria-label', open ? 'Sakrij meni' : 'Prikaži meni');
-    };
     menuBtn.onclick = () => setMenuOpen(!sidebar.classList.contains('open'));
     menuBackdrop.onclick = () => setMenuOpen(false);
     document.addEventListener('keydown', e => {
@@ -1010,7 +1122,10 @@ async function init() {
         if (!$('#modal').classList.contains('hidden')) { if (!$('#editForm')) closeModal(); }
         else if (sidebar.classList.contains('open')) setMenuOpen(false);
     });
+    history.replaceState({ page: 'dashboard' }, '');
+    window.addEventListener('popstate', onPopState);
     await navigate('dashboard');
+    hideBoot();
     
     if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js').catch(() => {});
     
@@ -1023,4 +1138,4 @@ async function init() {
     });
 }
 
-init();
+init().catch(bootFail);
