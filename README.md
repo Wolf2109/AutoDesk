@@ -124,3 +124,11 @@ Stavka menija **Lična vozila** služi za evidenciju privatnih vozila i njihovih
 ## Gorivo
 
 Stavka menija **Gorivo** prati točenja goriva svih vozila zajedno (ne deli se po vozilu). Unosi se čuvaju u `autodesk_private/{uid}/fuel`, odvojeno od radionice. Prikazuje statistiku (ukupno, litara, prosečna cena, poslednja cena), grafikon potrošnje po mesecima (po vrsti goriva), grafikon cene po litru, preglede po vrsti goriva i po godinama, filter po godini i listu unosa. JSON uvoz/izvoz: `Datum`, `Vreme`, `Naziv proizvoda`, `Litara`, `Cena`, `Bodovi`, `RSD/L`. Nova Firestore pravila nisu potrebna (važe ista kao za lična vozila).
+
+## Offline rad i ručna sinhronizacija (Lična vozila i Gorivo)
+
+- Obe stranice čitaju samo iz lokalne kopije u pregledaču, pa se prikazuju i bez interneta i ne troše Firestore čitanja pri svakom otvaranju.
+- Podaci se povlače iz Firebase-a dugmetom **Sinhronizuj** (gornja traka, prikazuje vreme poslednje sinhronizacije). Automatski se to desi samo jednom, ako lokalna kopija još ne postoji.
+- Dodavanje, izmena, brisanje i uvoz upisuju u Firebase i odmah u lokalnu kopiju (bez ponovnog čitanja). Bez interneta su izmene isključene, samo pregled.
+- Jedna sinhronizacija čita sva vozila, servise i unose goriva (broj čitanja = broj dokumenata).
+- Gorivo: **Mesečni prikaz** po izabranoj godini (dizel, benzin i ukupno: litara i iznos).

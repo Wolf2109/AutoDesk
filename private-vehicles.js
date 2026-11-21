@@ -27,9 +27,9 @@ const PrivateVehicles = (() => {
     const byDate = (a, b) => (b.date || '').localeCompare(a.date || '') || (b.km || 0) - (a.km || 0);
 
     async function load() {
-        const [v, e] = await Promise.all([vcol().get(), ecol().get()]);
-        pv.vehicles = v.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => (a.name || '').localeCompare(b.name || ''));
-        pv.entries = e.docs.map(d => ({ id: d.id, ...d.data() }));
+        const c = PrivateCache.load();   // čita se samo lokalna kopija; Firebase tek na „Sinhronizuj“
+        pv.vehicles = c.vehicles.slice().sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+        pv.entries = c.entries.slice();
         if (!pv.vehicles.some(x => x.id === pv.selected)) pv.selected = pv.vehicles[0]?.id || '';
     }
 
@@ -39,13 +39,14 @@ const PrivateVehicles = (() => {
     /* ---------- prikaz ---------- */
 
     async function render() {
+        await PrivateCache.ensureFirst();
         await load();
         const v = current();
         const tabs = pv.vehicles.map(x => `<button class="${x.id === pv.selected ? 'active' : ''}" data-pvtab="${esc(x.id)}">${esc(x.name)}${x.registration ? ' · ' + esc(x.registration) : ''}</button>`).join('');
 
         let body;
         if (!v) {
-            body = `<section class="panel"><div class="empty">Još nema ličnih vozila.<br>Dodajte vozilo ili uvezite JSON izvoz sa servisima.</div></section>`;
+            body = `<section class="panel"><div class="empty">Još nema ličnih vozila.<br>Dodajte vozilo, uvezite JSON ili pritisnite „Sinhronizuj“.</div></section>`;
         } else {
             const list = entriesOf(v.id);
             const totals = {};
@@ -78,6 +79,7 @@ const PrivateVehicles = (() => {
         }
 
         $('#content').innerHTML = `
+            ${PrivateCache.bar()}
             <div class="toolbar">
                 <div class="search-wrapper"><input class="search" id="pvSearch" placeholder="Pretraži servise…" value="${esc(pv.q)}"></div>
                 <div style="display:flex; gap:8px; flex-wrap:wrap;">
@@ -90,6 +92,7 @@ const PrivateVehicles = (() => {
             ${tabs ? `<div class="pvTabs">${tabs}</div>` : ''}
             ${body}`;
 
+        PrivateCache.bind(render);
         document.querySelectorAll('[data-pvtab]').forEach(b => b.onclick = () => { pv.selected = b.dataset.pvtab; pv.q = ''; render().catch(e => toast(e.message)); });
         $('#pvAddVehicle').onclick = () => vehicleForm();
         $('#pvAddEntry').onclick = () => entryForm();
@@ -131,7 +134,7 @@ const PrivateVehicles = (() => {
         box.querySelectorAll('[data-pvedit]').forEach(b => b.onclick = () => entryForm(pv.entries.find(x => x.id === b.dataset.pvedit)));
         box.querySelectorAll('[data-pvdel]').forEach(b => b.onclick = async () => {
             if (!confirm('Obrisati ovaj unos?')) return;
-            try { await ecol().doc(b.dataset.pvdel).delete(); await render(); toast('Unos je obrisan.'); } catch (e) { toast(e.message); }
+            try { PrivateCache.needOnline(); await ecol().doc(b.dataset.pvdel).delete(); PrivateCache.remove('entries', b.dataset.pvdel); await render(); toast('Unos je obrisan.'); } catch (e) { toast(e.message); }
         });
     }
 
@@ -146,11 +149,12 @@ const PrivateVehicles = (() => {
             field('VIN', 'vin', item.vin, 'text', false, 'full') +
             textArea('Beleške', 'notes', item.notes),
             async b => {
+                PrivateCache.needOnline();
                 const name = (b.name || '').trim();
                 if (!name) throw Error('Unesite naziv vozila.');
                 const data = { name, registration: (b.registration || '').trim(), year: (b.year || '').trim(), vin: (b.vin || '').trim(), notes: (b.notes || '').trim() };
-                if (item.id) await vcol().doc(item.id).update(data);
-                else pv.selected = (await vcol().add({ ...data, created: CloudSync.privateStamp() })).id;
+                if (item.id) { await vcol().doc(item.id).update(data); PrivateCache.upsert('vehicles', { id: item.id, ...data }); }
+                else { const ref = await vcol().add({ ...data, created: CloudSync.privateStamp() }); PrivateCache.upsert('vehicles', { id: ref.id, ...data }); pv.selected = ref.id; }
             }
         );
     }
@@ -170,6 +174,7 @@ const PrivateVehicles = (() => {
             curField +
             textArea('Opis / beleške', 'notes', item.notes),
             async b => {
+                PrivateCache.needOnline();
                 if (!b.vehicle_id) throw Error('Izaberite vozilo.');
                 if (!/^\d{4}-\d{2}-\d{2}$/.test(b.date || '')) throw Error('Unesite ispravan datum.');
                 const title = (b.title || '').trim();
@@ -182,8 +187,8 @@ const PrivateVehicles = (() => {
                     amount: b.amount === '' ? 0 : Math.round(Number(b.amount) * 100) / 100,
                     currency: CURRENCIES.includes(b.currency) ? b.currency : 'RSD'
                 };
-                if (item.id) await ecol().doc(item.id).update(data);
-                else await ecol().add({ ...data, created: CloudSync.privateStamp() });
+                if (item.id) { await ecol().doc(item.id).update(data); PrivateCache.upsert('entries', { id: item.id, ...data }); }
+                else { const ref = await ecol().add({ ...data, created: CloudSync.privateStamp() }); PrivateCache.upsert('entries', { id: ref.id, ...data }); }
                 pv.selected = b.vehicle_id;
             }
         );
@@ -193,8 +198,11 @@ const PrivateVehicles = (() => {
         const n = entriesOf(v.id).length;
         if (!confirm(`Obrisati vozilo „${v.name}“ i svih ${n} unosa servisa? Ovo se ne može poništiti.\nPreporuka: prvo izvezite JSON.`)) return;
         try {
+            PrivateCache.needOnline();
             await CloudSync.privateBatchDelete(entriesOf(v.id).map(e => ecol().doc(e.id)));
             await vcol().doc(v.id).delete();
+            PrivateCache.removeWhere('entries', e => e.vehicle_id === v.id);
+            PrivateCache.remove('vehicles', v.id);
             pv.selected = '';
             await render();
             toast('Vozilo je obrisano.');
@@ -262,20 +270,23 @@ const PrivateVehicles = (() => {
             const btn = ev.target.querySelector('button.primary');
             btn.disabled = true;
             try {
+                PrivateCache.needOnline();
                 let id = $('#f_target').value;
                 if (!id) {
                     const name = $('#f_newname').value.trim();
                     if (!name) throw Error('Unesite naziv novog vozila.');
                     id = (await vcol().add({ name, registration: '', year: '', vin: '', notes: '', created: CloudSync.privateStamp() })).id;
+                    PrivateCache.upsert('vehicles', { id, name, registration: '', year: '', vin: '', notes: '' });
                 }
                 const key = r => [r.date, r.km ?? '', r.title, r.amount].join('|');
                 const have = new Set(pv.entries.filter(x => x.vehicle_id === id).map(key));
                 const fresh = rows.filter(r => { const k = key(r); if (have.has(k)) return false; have.add(k); return true; });
                 const db = CloudSync.privateDb();
                 for (let i = 0; i < fresh.length; i += 400) {
-                    const b = db.batch();
-                    fresh.slice(i, i + 400).forEach(r => b.set(ecol().doc(), { ...r, vehicle_id: id, created: CloudSync.privateStamp() }));
+                    const b = db.batch(), added = [];
+                    fresh.slice(i, i + 400).forEach(r => { const ref = ecol().doc(); b.set(ref, { ...r, vehicle_id: id, created: CloudSync.privateStamp() }); added.push({ id: ref.id, ...r, vehicle_id: id }); });
                     await b.commit();
+                    added.forEach(x => PrivateCache.upsert('entries', x));
                 }
                 pv.selected = id;
                 closeModal();

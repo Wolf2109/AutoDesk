@@ -7,7 +7,7 @@
 const FuelTracker = (() => {
     const COLORS = ['#FFB81C', '#4DA3FF', '#3DDC97', '#C58AFF', '#FF8A8A'];
     const MONTHS = ['Januar', 'Februar', 'Mart', 'April', 'Maj', 'Jun', 'Jul', 'Avgust', 'Septembar', 'Oktobar', 'Novembar', 'Decembar'];
-    const st = { all: [], year: '', limit: 30 };
+    const st = { all: [], year: '', mYear: '', limit: 30 };
 
     const col = () => CloudSync.privateRoot().collection('fuel');
     const n2 = n => new Intl.NumberFormat('sr-Latn-RS', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(Number(n) || 0);
@@ -24,8 +24,7 @@ const FuelTracker = (() => {
     };
 
     async function load() {
-        const snap = await col().get();
-        st.all = snap.docs.map(d => ({ id: d.id, ...d.data() })).sort(byTime);
+        st.all = PrivateCache.load().fuel.slice().sort(byTime);   // samo lokalna kopija; Firebase tek na „Sinhronizuj“
         const years = [...new Set(st.all.map(e => e.date.slice(0, 4)))];
         if (st.year && !years.includes(st.year)) st.year = '';
     }
@@ -33,12 +32,15 @@ const FuelTracker = (() => {
     /* ---------- prikaz ---------- */
 
     async function render() {
+        await PrivateCache.ensureFirst();
         await load();
         const years = [...new Set(st.all.map(e => e.date.slice(0, 4)))].sort().reverse();
         const list = st.all.filter(e => !st.year || e.date.startsWith(st.year));
         const tabs = years.length > 1 ? `<div class="pvTabs"><button class="${st.year ? '' : 'active'}" data-fy="">Sve godine</button>${years.map(y => `<button class="${st.year === y ? 'active' : ''}" data-fy="${y}">${y}</button>`).join('')}</div>` : '';
 
+        if (!years.includes(st.mYear)) st.mYear = st.year || years[0] || '';
         $('#content').innerHTML = `
+            ${PrivateCache.bar()}
             <div class="toolbar">
                 <div class="subtle" style="align-self:center">Praćenje goriva (sva vozila zajedno)</div>
                 <div style="display:flex; gap:8px; flex-wrap:wrap;">
@@ -49,15 +51,17 @@ const FuelTracker = (() => {
             </div>
             <input type="file" id="fuFile" accept="application/json,.json" class="hidden">
             ${tabs}
-            ${list.length ? body(list) : '<section class="panel"><div class="empty">Još nema unosa goriva.<br>Dodajte unos ili uvezite JSON.</div></section>'}`;
+            ${list.length ? body(list) : '<section class="panel"><div class="empty">Još nema unosa goriva.<br>Dodajte unos, uvezite JSON ili pritisnite „Sinhronizuj“.</div></section>'}`;
 
-        document.querySelectorAll('[data-fy]').forEach(b => b.onclick = () => { st.year = b.dataset.fy; st.limit = 30; render().catch(e => toast(e.message)); });
+        PrivateCache.bind(render);
+        document.querySelectorAll('[data-fy]').forEach(b => b.onclick = () => { st.year = b.dataset.fy; if (st.year) st.mYear = st.year; st.limit = 30; render().catch(e => toast(e.message)); });
         $('#fuAdd').onclick = () => entryForm();
         $('#fuImport').onclick = () => $('#fuFile').click();
         $('#fuFile').onchange = onFile;
         $('#fuExport').onclick = exportJson;
         if (list.length) {
             renderList(list);
+            renderMonthly();
             const sc = document.querySelector('.fuBars'); if (sc) sc.scrollLeft = sc.scrollWidth;
         }
     }
@@ -77,11 +81,35 @@ const FuelTracker = (() => {
         const legend = prods.map(p => `<span><i class="dot" style="background:${colorOf(p)}"></i>${esc(p)}</span>`).join('');
         return `<div class="statsGrid fuStats">${cards}</div>
             <section class="panel fuPanel"><h3>Potrošnja po mesecima (RSD)</h3>${barChart(months, prods)}<div class="legend">${legend}</div></section>
+            <section class="panel fuPanel" id="fuMonthly"></section>
             <div class="twoCol fuTwo">
                 <section class="panel fuPanel"><h3>Po vrsti goriva</h3>${summary(list, prods, e => e.product)}</section>
                 ${st.year ? '' : `<section class="panel fuPanel"><h3>Po godinama</h3>${summary(list, [...new Set(list.map(e => e.date.slice(0, 4)))].sort().reverse(), e => e.date.slice(0, 4))}</section>`}
             </div>
             <section class="panel fuPanel" id="fuList"></section>`;
+    }
+
+
+    /* ---------- mesečni prikaz za izabranu godinu ---------- */
+
+    const isDiesel = e => /DIZEL|DIESEL/i.test(e.product);
+
+    function renderMonthly() {
+        const box = $('#fuMonthly');
+        if (!box) return;
+        const years = [...new Set(st.all.map(e => e.date.slice(0, 4)))].sort().reverse();
+        const grp = (a, f) => { const x = a.filter(f); return { l: sum(x, e => e.liters), p: sum(x, e => e.price), n: x.length }; };
+        const cell = (g, name) => `<div class="mg" data-g="${name}"><span>${g.n ? n2(g.l) + ' L' : '–'}</span><span>${g.n ? rsd(g.p) : '–'}</span></div>`;
+        const row = (label, a, cls = '') => {
+            const d = grp(a, isDiesel), p = grp(a, e => !isDiesel(e)), t = grp(a, () => true);
+            return `<div class="fmRow ${cls} ${t.n ? '' : 'fmEmpty'}"><b class="fmName">${label}</b>${cell(d, 'Dizel')}${cell(p, 'Benzin')}${cell(t, 'Ukupno')}</div>`;
+        };
+        const yearAll = st.all.filter(e => e.date.startsWith(st.mYear));
+        const rows = MONTHS.map((m, i) => row(m, yearAll.filter(e => e.date.slice(5, 7) === String(i + 1).padStart(2, '0')))).join('');
+        box.innerHTML = `<div class="fmTop"><h3>Mesečni prikaz</h3><select id="fuMYear" aria-label="Godina">${years.map(y => `<option ${y === st.mYear ? 'selected' : ''}>${y}</option>`).join('')}</select></div>
+            <div class="fmHead"><span>Mesec</span><span>Dizel · litara / iznos</span><span>Benzin · litara / iznos</span><span>Ukupno · litara / iznos</span></div>
+            ${rows}${row('Ukupno ' + st.mYear, yearAll, 'fmTotal')}`;
+        $('#fuMYear').onchange = e => { st.mYear = e.target.value; renderMonthly(); };
     }
 
     function monthly(list) {
@@ -125,7 +153,7 @@ const FuelTracker = (() => {
         box.querySelectorAll('[data-fedit]').forEach(b => b.onclick = () => entryForm(st.all.find(x => x.id === b.dataset.fedit)));
         box.querySelectorAll('[data-fdel]').forEach(b => b.onclick = async () => {
             if (!confirm('Obrisati ovaj unos?')) return;
-            try { await col().doc(b.dataset.fdel).delete(); await render(); toast('Unos je obrisan.'); } catch (e) { toast(e.message); }
+            try { PrivateCache.needOnline(); await col().doc(b.dataset.fdel).delete(); PrivateCache.remove('fuel', b.dataset.fdel); await render(); toast('Unos je obrisan.'); } catch (e) { toast(e.message); }
         });
     }
 
@@ -144,12 +172,13 @@ const FuelTracker = (() => {
             field('Iznos (RSD)', 'price', item.price ?? '', 'number', true) +
             field('Bodovi', 'points', item.points ?? '', 'number'),
             async b => {
+                PrivateCache.needOnline();
                 const liters = Number(b.liters), price = Number(b.price);
                 if (!/^\d{4}-\d{2}-\d{2}$/.test(b.date || '')) throw Error('Unesite ispravan datum.');
                 if (!(liters > 0) || !(price > 0)) throw Error('Litara i iznos moraju biti veći od nule.');
                 const data = { date: b.date, time: b.time || '', product: (b.product || '').trim().toUpperCase() || 'GORIVO', liters: Math.round(liters * 100) / 100, price: Math.round(price * 100) / 100, points: b.points === '' ? null : Math.round(Number(b.points)) };
-                if (item.id) await col().doc(item.id).update(data);
-                else await col().add({ ...data, created: CloudSync.privateStamp() });
+                if (item.id) { await col().doc(item.id).update(data); PrivateCache.upsert('fuel', { id: item.id, ...data }); }
+                else { const ref = await col().add({ ...data, created: CloudSync.privateStamp() }); PrivateCache.upsert('fuel', { id: ref.id, ...data }); }
             }
         );
     }
@@ -188,6 +217,7 @@ const FuelTracker = (() => {
         e.target.value = '';
         if (!file) return;
         try {
+            PrivateCache.needOnline();
             const rows = parseRows(await file.text());
             const key = r => [r.date, r.time, r.liters, r.price].join('|');
             const have = new Set(st.all.map(key));
@@ -195,9 +225,10 @@ const FuelTracker = (() => {
             if (!confirm(`U fajlu je ${rows.length} unosa. Novih za uvoz: ${fresh.length}, već postoji: ${rows.length - fresh.length}.\nUvesti?`)) return;
             const db = CloudSync.privateDb();
             for (let i = 0; i < fresh.length; i += 400) {
-                const b = db.batch();
-                fresh.slice(i, i + 400).forEach(r => b.set(col().doc(), { ...r, created: CloudSync.privateStamp() }));
+                const b = db.batch(), added = [];
+                fresh.slice(i, i + 400).forEach(r => { const ref = col().doc(); b.set(ref, { ...r, created: CloudSync.privateStamp() }); added.push({ id: ref.id, ...r }); });
                 await b.commit();
+                added.forEach(x => PrivateCache.upsert('fuel', x));
             }
             toast(`Uvezeno: ${fresh.length}.`);
             await refresh();

@@ -899,3 +899,33 @@ button { touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
     .fuStats .stat small { display: block; margin-top: 4px; line-height: 1.35; }
     .fsRow { padding: 10px 0; gap: 6px 12px; }
 }
+
+/* ---------- Sinhronizacija / offline ---------- */
+.syncBar { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; padding: 10px 14px; border: 1px solid var(--line); border-radius: 14px; background: var(--card); }
+.syncInfo { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); min-width: 0; }
+.syncDot { width: 9px; height: 9px; border-radius: 50%; flex: none; background: #35C879; }
+.syncDot.off { background: #E34B4B; }
+
+/* ---------- Gorivo: mesečni prikaz ---------- */
+.fmTop { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 8px; }
+.fmTop h3 { margin: 0; }
+.fmTop select { width: auto; min-width: 96px; }
+.fmHead, .fmRow { display: grid; grid-template-columns: minmax(0, 1.1fr) repeat(3, minmax(0, 2fr)); gap: 10px; align-items: baseline; padding: 10px 0; }
+.fmHead { color: var(--muted); font-size: 10.5px; letter-spacing: .5px; text-transform: uppercase; border-bottom: 1px solid var(--line-strong); }
+.fmRow { border-bottom: 1px solid var(--line); font-size: 13px; }
+.fmRow.fmEmpty { opacity: .45; }
+.fmRow.fmTotal { border-bottom: 0; border-top: 1px solid var(--line-strong); font-weight: 700; opacity: 1; }
+.fmRow .mg { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr); gap: 8px; text-align: right; font-variant-numeric: tabular-nums; }
+
+@media (max-width: 760px) {
+    .syncBar { padding: 10px 12px; }
+    .syncBar button { flex: 1 1 100%; }
+    .fmHead { display: none; }
+    .fmRow { grid-template-columns: 1fr; gap: 6px; padding: 14px 0; }
+    .fmRow.fmEmpty { display: none; }
+    .fmRow .fmName { font-size: 15px; margin-bottom: 2px; }
+    .fmRow .mg { grid-template-columns: 64px minmax(0, 1fr) minmax(0, 1.3fr); text-align: right; }
+    .fmRow .mg::before { content: attr(data-g); text-align: left; color: var(--muted); font-size: 12px; }
+    .fmRow.fmTotal .mg[data-g="Ukupno"] { font-weight: 700; }
+}
+.fmHead span:not(:first-child) { text-align: right; }

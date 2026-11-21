@@ -1,6 +1,6 @@
 'use strict';
-const CACHE = 'autodesk-ui-20261121-v9';
-const FILES = ['./', './index.html', './style.css', './app.js', './print-docs.js', './local-api.js', './cloud-sync.js', './private-vehicles.js', './fuel.js', './manifest.json', './favicon.ico', './slike/logo.png', './icons/icon-192.png', './icons/icon-512.png'];
+const CACHE = 'autodesk-ui-20261121-v10';
+const FILES = ['./', './index.html', './style.css', './app.js', './print-docs.js', './local-api.js', './cloud-sync.js', './private-cache.js', './private-vehicles.js', './fuel.js', './manifest.json', './favicon.ico', './slike/logo.png', './icons/icon-192.png', './icons/icon-512.png'];
 const SDK = 'https://www.gstatic.com/firebasejs/';
 
 self.addEventListener('install', e => e.waitUntil(caches.open(CACHE).then(c => c.addAll(FILES)).then(() => self.skipWaiting())));
@@ -20,9 +20,9 @@ self.addEventListener('fetch', e => {
     return;
   }
 
-  if (u.origin !== self.location.origin || u.pathname.endsWith('/firebase-config.js')) return;
+  if (u.origin !== self.location.origin) return;
 
-  // Fajlovi aplikacije: prvo mreža (uvek najnovija verzija), a keš kada nema interneta.
+  // Fajlovi aplikacije (i firebase-config.js, da se prijava i pokretanje rade bez interneta): prvo mreža, a keš kada nema interneta.
   e.respondWith(fetch(req).then(r => {
     if (r.ok) { const copy = r.clone(); caches.open(CACHE).then(c => c.put(req, copy)); }
     return r;
