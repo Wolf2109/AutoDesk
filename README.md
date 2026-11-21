@@ -109,3 +109,73 @@ Aplikacija sadrži dva modula odvojena od evidencije radionice, sa sopstvenim re
 ├── icons/              # Ikonice aplikacije za različite rezolucije
 ├── slike/              # Dodatni vizuelni i grafički resursi
 └── UPUTSTVO.md         # Detaljno uputstvo za podešavanje, rad i ažuriranje
+```
+
+---
+
+## Podešavanje i pokretanje
+
+### Brzo podešavanje
+
+1. U Firebase konzoli kreirajte projekat i omogućite **Authentication (Email/Password)** i **Cloud Firestore**.
+2. Kreirajte jedan korisnički nalog (vlasnik) i sačuvajte njegov **UID**.
+3. U fajl `firebase-config.js` unesite konfiguraciju Firebase web aplikacije i postavljeni `ownerUid`.
+4. U fajlu `firestore.rules` postavite isti UID i objavite pravila u konzoli (*Firestore Database → Rules*), uključujući pravila za `autodesk_users` i `autodesk_private`.
+5. Na GitHub repozitorijumu uključite **GitHub Pages** (grana `main`, direktorijum `/ (root)`).
+
+Detaljnija uputstva za instalaciju i ažuriranje postojeće verzije nalaze se u [UPUTSTVO.md](UPUTSTVO.md).
+
+### Lokalno pokretanje
+
+Pošto se radi o statičkoj aplikaciji i PWA rešenju (Service Worker i Firebase SDK ne rade preko `file://` protokola), pokrenite lokalni web server:
+
+```bash
+npx serve .
+# ili
+python3 -m http.server 8080
+```
+
+Otvorite `http://localhost:8080` u pregledaču. Za prijavu je potreban ispravan `firebase-config.js`, a `localhost` mora biti dodat u listu dozvoljenih domena u **Firebase Authentication** podešavanjima.
+
+---
+
+## Model podataka u Firestore-u
+
+Podaci radionice nalaze se u kolekciji `autodesk_users/{uid}`, dok su privatni moduli izdvojeni u `autodesk_private/{uid}`:
+
+| Putanja | Sadržaj |
+| --- | --- |
+| `autodesk_users/{uid}/sync/meta` | verzija evidencije i pokazivač na aktivni zapis |
+| `autodesk_users/{uid}/sync/{prefiks}{i}` | podaci radionice (klijenti, vozila, nalozi, cenovnik, podešavanja) podeljeni u JSON delove, bez fotografija |
+| `autodesk_users/{uid}/photos/{id}` | pojedinačna kompresovana fotografija vezana za nalog |
+| `autodesk_users/{uid}/backups/{ime}` i `.../chunks/{i}` | rezervne kopije baze radionice |
+| `autodesk_private/{uid}` | dokumenti ličnih vozila i njihovih servisa |
+| `autodesk_private/{uid}/fuel` | unosi o točenju goriva |
+
+Svaka izmena podataka radionice proverava verziju u oblaku pre upisa i izvršava se samo ako se verzija poklapa. Periodična provera promena u oblaku vrši se jednom u minuti, što održava potrošnju čitanja znatno ispod besplatne dnevne kvote za jednu radionicu.
+
+---
+
+## Bezbednost i ograničenja
+
+### Bezbednost
+
+- Vrednost `apiKey` u `firebase-config.js` je javna po prirodi Firebase klijentskih aplikacija; stvarnu zaštitu podataka obezbeđuju **Firestore pravila** ograničena na UID vlasnika.
+- **Ne objavljujte privatne podatke** (JSON izvoze, rezervne kopije, spiskove klijenata) na javne repozitorijume.
+- Preporuka je da povremeno preuzimate *„Izvezi JSON“* kao lokalnu arhivu, jer rezervne kopije u okviru aplikacije ne uključuju fotografije.
+
+### Ograničenja
+
+- Aplikacija je projektovana za **jednog vlasnika / jedan nalog** (bez više korisničkih uloga ili timskih naloga).
+- Izmene podataka zahtevaju aktivnu internet vezu.
+- Ne preporučuje se istovremeni rad na dva uređaja; u slučaju konflikta verzija aplikacija će upozoriti korisnika i zatražiti ponavljanje izmene.
+- Brojevi stranica pri štampi / izvozu u PDF podržani su u pregledačima zasnovanim na Chromium-u (Chrome, Edge).
+- Preračunavanje između RSD i EUR koristi fiksni kurs **1 EUR = 120 RSD**.
+
+---
+
+## Licenca
+
+**Privatni projekat – sva prava zadržana.**
+
+Projekat AutoDesk razvijen je za potrebe interne evidencije i poslovanja auto-servisa. Nije objavljen pod licencom otvorenog koda. Sva prava na izvorni kod, dizajn i funkcionalnosti zadržava vlasnik projekta.
