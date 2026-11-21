@@ -820,7 +820,6 @@ button { touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
     .pvStats { display: grid; grid-template-columns: 1fr 1fr; gap: 12px 16px; margin-top: 14px; }
     .pvStats strong { font-size: 15px; overflow-wrap: anywhere; }
     .pvActions { width: 100%; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-    .pvActions .danger { grid-column: 1 / -1; }
 
     /* lista unosa: bez okvira panela, svaki unos je jedna kartica */
     #pvTable.pvPanel { background: none; border: 0; padding: 0; box-shadow: none; }

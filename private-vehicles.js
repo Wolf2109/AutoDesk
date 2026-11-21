@@ -68,6 +68,7 @@ const PrivateVehicles = (() => {
                     </div>
                     <div class="pvActions">
                         <button class="secondary" id="pvEditVehicle">Izmeni vozilo</button>
+                        <button class="secondary" id="pvPdf">Izvezi PDF</button>
                         <button class="secondary" id="pvExport">Izvezi JSON</button>
                         <button class="danger" id="pvDeleteVehicle">Obriši vozilo</button>
                     </div>
@@ -97,6 +98,7 @@ const PrivateVehicles = (() => {
         $('#pvSearch').oninput = e => { pv.q = e.target.value; renderTable(); };
         if (v) {
             $('#pvEditVehicle').onclick = () => vehicleForm(v);
+            $('#pvPdf').onclick = () => { try { AutoDeskPrint.previewPrivate(v, entriesOf(v.id)); } catch (e) { toast(e.message); } };
             $('#pvExport').onclick = () => exportJson(v);
             $('#pvDeleteVehicle').onclick = () => deleteVehicle(v);
             renderTable();

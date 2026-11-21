@@ -4,6 +4,7 @@
  *  - Izveštaj o radnim nalozima (A4 položeno)
  *  - Radni nalog za klijenta (A4 uspravno, sa fotografijama i mestima za potpis)
  *  - Servisna istorija vozila (A4 uspravno)
+ *  - Servisna knjižica ličnog vozila (A4 uspravno, bez podataka radionice)
  * Dokument za klijenta ne prikazuje interne iznose (potrošeno / razlika); oni su samo u izveštaju.
  */
 window.AutoDeskPrint = (() => {
@@ -207,6 +208,61 @@ footer{border-top:1px solid #DDE2EA;margin-top:28px;padding-top:10px;color:#6670
     w.document.open(); w.document.write(html); w.document.close();
   }
 
+  /* ---------- lična vozila (zasebna celina, bez podataka radionice) ---------- */
+
+  function privateDoc(ctx, v, entries) {
+    const d = makeDate('DD.MM.YYYY');
+    const list = entries.slice().sort((a, b) => (b.date || '').localeCompare(a.date || '') || (b.km || 0) - (a.km || 0));
+    const cents = e => Math.round((Number(e.amount) || 0) * 100), cur = e => e.currency || 'RSD';
+    const totals = {};
+    list.forEach(e => { totals[cur(e)] = (totals[cur(e)] || 0) + cents(e); });
+    const currencies = Object.keys(totals).filter(c => totals[c] > 0);
+    const lastKm = list.reduce((m, e) => Math.max(m, e.km || 0), 0);
+    const from = list.length ? list[list.length - 1].date : '', to = list.length ? list[0].date : '';
+
+    const rows = list.map(e => `<tr><td><b>${esc(d(e.date))}</b></td><td class="r">${e.km || e.km === 0 ? esc(thousands(e.km)) : '–'}</td><td>${esc(e.type)}</td>` +
+      `<td><b>${esc(e.title)}</b>${e.notes ? `<small class="pre" style="font-size:10px">${esc(e.notes)}</small>` : ''}</td>` +
+      `<td class="r"><b>${cents(e) ? esc(money(cents(e), cur(e))) : '–'}</b></td></tr>`).join('');
+    const sums = currencies.map((c, i) => `<tr class="sum"><td colspan="4">UKUPNO (${esc(c)})${i === 0 ? ' · ' + list.length + (list.length === 1 ? ' unos' : ' unosa') : ''}</td><td class="r">${esc(money(totals[c], c))}</td></tr>`).join('');
+
+    const years = new Map();
+    list.forEach(e => {
+      const y = String(e.date || '').slice(0, 4), r = years.get(y) || { y, count: 0, sums: {} };
+      r.count++; r.sums[cur(e)] = (r.sums[cur(e)] || 0) + cents(e);
+      years.set(y, r);
+    });
+    const yearly = years.size > 1
+      ? `<h2>Pregled po godinama</h2><table><thead><tr><th>Godina</th><th class="r">Unosa</th>${currencies.map(c => `<th class="r">Ukupno (${esc(c)})</th>`).join('')}</tr></thead><tbody>` +
+        [...years.values()].sort((a, b) => b.y.localeCompare(a.y)).map(r => `<tr><td><b>${esc(r.y)}</b></td><td class="r">${r.count}</td>${currencies.map(c => `<td class="r">${r.sums[c] ? esc(money(r.sums[c], c)) : '–'}</td>`).join('')}</tr>`).join('') +
+        `</tbody></table>`
+      : '';
+
+    const body =
+      `<div class="metrics">${metric('Broj unosa', list.length, 'navy')}${metric('Poslednja kilometraža', lastKm ? thousands(lastKm) + ' km' : '–')}${currencies.map(c => metric('Ukupno (' + c + ')', money(totals[c], c), 'green')).join('')}</div>` +
+      `<div class="infoGrid">` +
+      card('Vozilo', field('Vozilo', v.name) + field('Registracija', v.registration) + field('VIN', v.vin) + field('Godište', v.year)) +
+      card('Evidencija', field('Prvi unos', d(from)) + field('Poslednji unos', d(to)) + field('Beleške', v.notes)) +
+      `</div>` + yearly + `<h2>Servisi i troškovi</h2>` +
+      (list.length
+        ? `<table><colgroup><col width="12%"><col width="11%"><col width="15%"><col><col width="17%"></colgroup><thead><tr><th>Datum</th><th class="r">Km</th><th>Tip</th><th>Naslov i opis</th><th class="r">Iznos</th></tr></thead><tbody>${rows}${sums}</tbody></table>`
+        : '<p class="paragraph">Za ovo vozilo još nema unosa.</p>');
+    return frame(ctx, { title: 'SERVISNA KNJIŽICA', number: v.name || 'Vozilo', meta: [v.registration || '', 'Unosa: ' + list.length].filter(Boolean), body });
+  }
+
+  /** Lična vozila: isti izgled dokumenta, ali bez zaglavlja i podataka radionice. Pozvati direktno iz klika. */
+  function previewPrivate(vehicle, entries) {
+    const w = window.open('', '_blank');
+    if (!w) throw Error('Dozvolite otvaranje novih kartica za pregled dokumenta.');
+    w.document.write('<!doctype html><meta charset="utf-8"><title>AutoDesk</title><body style="font:14px Arial;padding:30px;color:#444">Priprema dokumenta…</body>');
+    w.document.close();
+    logoData()
+      .then(logo => {
+        const html = privateDoc({ shop: {}, name: 'Evidencija ličnih vozila', logo }, vehicle, entries);
+        w.document.open(); w.document.write(html); w.document.close();
+      })
+      .catch(e => { w.document.body.textContent = 'Greška: ' + e.message; });
+  }
+
   /** Mora se pozvati direktno iz klika (inače pregledač blokira novu karticu). */
   function preview(url) {
     const w = window.open('', '_blank');
@@ -216,5 +272,5 @@ footer{border-top:1px solid #DDE2EA;margin-top:28px;padding-top:10px;color:#6670
     render(url, w).catch(e => { w.document.body.textContent = 'Greška: ' + e.message; });
   }
 
-  return { preview };
+  return { preview, previewPrivate };
 })();
