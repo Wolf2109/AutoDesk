@@ -1,122 +1,338 @@
 # AutoDesk
 
-Web aplikacija za evidenciju radnih naloga, vozila i klijenata auto radionice. Radi u pregledaču (računar, telefon, tablet) i može se instalirati kao aplikacija (PWA). Nema sopstvenog servera: front-end se hostuje na **GitHub Pages**, a podaci se čuvaju u **Firebase Cloud Firestore** bazi, uz prijavu jednog vlasničkog naloga.
+**AutoDesk** je web aplikacija namenjena digitalnoj evidenciji rada auto-servisa. Omogućava upravljanje radnim nalozima, klijentima, vozilima, servisnim uslugama i finansijama, uz pregled statistike, generisanje dokumenata i upravljanje rezervnim kopijama podataka.
 
-## Mogućnosti
+Aplikacija je prilagođena za korišćenje na računarima, tabletima i mobilnim telefonima. Podržava instalaciju kao **Progressive Web App (PWA)** i rad u režimu bez internet konekcije za pregled prethodno sinhronizovanih podataka.
 
-**Radni nalozi**
-- Automatski brojevi naloga (`RN-000001`, ...), datum, klijent i vozilo
-- Status: Primljeno, U radu, Čeka deo, Završeno, Preuzeto (brza promena u detaljima naloga)
-- Prijavljeni problem, opis izvršenog posla, kodovi grešaka (DTC), napomena
-- Kilometraža pri prijemu (automatski ažurira kilometražu vozila)
-- Podsetnik za sledeći servis po datumu i/ili kilometraži
-- Finansije: potrošeno, naplaćeno i razlika, u RSD ili EUR
-- Dodavanje usluge iz cenovnika (naziv ide u opis, cena u „Naplaćeno“), dupliranje naloga
-- Fotografije uz nalog (smanjuju se u pregledaču pre čuvanja, do 12 po nalogu)
-- Filteri po periodu, klijentu, vozilu i statusu, pretraga (uključujući kodove grešaka)
+Projekat koristi statički hosting putem **GitHub Pages** i **Firebase Cloud Firestore** za čuvanje podataka, bez potrebe za sopstvenim backend serverom.
 
-**Klijenti, vozila i cenovnik**
-- Evidencija klijenata (telefon kao link za poziv) i vozila (marka, model, godište, motor, snaga, gorivo, registracija, VIN, kilometraža)
-- Istorija naloga po klijentu i po vozilu
-- Zaštita istorije: klijent ili vozilo sa nalozima ne može se obrisati
+---
 
-**Kontrolna tabla i statistika**
-- Danas / ovaj mesec, grafikon kretanja, nalozi u toku
-- Podsetnik za servis (istekli ili u narednih 30 dana, ili dostignuta kilometraža)
-- Statistika po periodu, najčešće marke, klijenti i kodovi grešaka
-- Izvoz u CSV (format prilagođen srpskom Excelu)
+## Glavne funkcionalnosti
 
-**Dokumenti za štampu / PDF**
-- Radni nalog za klijenta (bez internih iznosa), izveštaj za period, servisna istorija vozila
-- Otvaraju se u novoj kartici; „Štampaj / Sačuvaj kao PDF“
+### 1. Radni nalozi
 
-**Podaci i bezbednost**
-- Rezervne kopije: automatska na svakih 1, 7, 15 ili 30 dana (podrazumevano 30; čuva se poslednjih 10), ručne do 30 komada, preuzimanje, vraćanje i brisanje
-- Izvoz i uvoz cele evidencije u JSON (sa fotografijama)
-- Provera verzije pri svakoj izmeni, pa dva uređaja ne mogu tiho da prepišu jedan drugom izmene
-- Pregled poslednjih sačuvanih podataka bez interneta (izmene zahtevaju vezu)
-- Prijava Firebase nalogom, promena lozinke i „Zaboravljena lozinka?“
+- Automatsko generisanje jedinstvenih brojeva radnih naloga (`RN-000001`, `RN-000002`...)
+- Evidencija datuma, klijenta i vozila
+- Upravljanje statusima radnih naloga:
+  - Primljeno
+  - U radu
+  - Čeka deo
+  - Završeno
+  - Preuzeto
+- Evidencija prijavljenog problema i izvršenih radova
+- Evidencija DTC kodova grešaka i internih napomena
+- Evidencija kilometraže pri prijemu vozila, uz automatsko ažuriranje kilometraže u kartici vozila
+- Podsetnici za naredni servis prema datumu i/ili kilometraži
+- Finansijska evidencija:
+  - Troškovi
+  - Naplaćeni iznos
+  - Razlika između troškova i naplate
+  - Podrška za RSD i EUR
+- Dodavanje usluga iz cenovnika direktno u radni nalog
+- Automatsko prenošenje naziva usluge u opis i cene u polje za naplatu
+- Mogućnost dupliranja postojećih radnih naloga
+- Dodavanje do 12 fotografija po radnom nalogu, uz automatsku optimizaciju veličine u pregledaču
+- Napredna pretraga i filtriranje prema periodu, klijentu, vozilu, statusu i DTC kodovima
+
+### 2. Klijenti, vozila i cenovnik
+
+**Evidencija klijenata**
+- Ime i prezime / naziv klijenta
+- Kontakt telefon sa mogućnošću direktnog pozivanja
+- Pregled kompletne istorije radnih naloga
+
+**Evidencija vozila**
+- Marka i model
+- Godište
+- Motor i snaga
+- Vrsta goriva
+- Registraciona oznaka
+- VIN broj
+- Trenutna kilometraža
+- Pregled servisne istorije
+
+**Cenovnik usluga**
+- Evidencija servisnih usluga i njihovih cena
+- Direktno dodavanje usluga u radne naloge
+
+Radi očuvanja integriteta podataka, klijenti i vozila koji imaju povezane radne naloge ne mogu se obrisati.
+
+### 3. Kontrolna tabla i statistika
+
+- Pregled dnevnih i mesečnih aktivnosti
+- Grafički prikaz kretanja broja radnih naloga
+- Pregled radnih naloga koji su trenutno u toku
+- Podsetnici za naredne servise:
+  - Istekli servisni intervali
+  - Servisi u narednih 30 dana
+  - Dostignuta servisna kilometraža
+- Statistika prema izabranom periodu
+- Najčešće servisirane marke vozila
+- Pregled najaktivnijih klijenata
+- Analiza najčešćih DTC kodova
+- Izvoz statističkih podataka u CSV formatu, prilagođenom srpskim regionalnim podešavanjima programa Microsoft Excel
+
+### 4. Dokumenti i PDF izveštaji
+
+Generisanje dokumenata spremnih za štampu ili čuvanje u PDF formatu:
+
+- Radni nalog za klijenta, bez prikaza internih finansijskih iznosa
+- Izveštaj o poslovanju za izabrani period
+- Servisna istorija pojedinačnog vozila
+
+Dokumenti se otvaraju u zasebnoj kartici pregledača, sa podrškom za štampanje i opciju „Sačuvaj kao PDF“.
+
+### 5. Rezervne kopije i upravljanje podacima
+
+**Automatske rezervne kopije**
+- Podesiv interval: 1, 7, 15 ili 30 dana
+- Podrazumevani interval: 30 dana
+- Automatsko čuvanje poslednjih 10 rezervnih kopija
+
+**Ručne rezervne kopije**
+- Kreiranje do 30 ručnih kopija
+- Preuzimanje kopija
+- Vraćanje prethodno sačuvanog stanja
+- Brisanje nepotrebnih kopija
+
+**Uvoz i izvoz**
+- Izvoz kompletne evidencije u JSON format, uključujući fotografije
+- Uvoz prethodno sačuvanih JSON podataka
+- CSV izvoz za dalju obradu i analizu
+
+**Kontrola sinhronizacije**
+- Provera verzije podataka pre svake izmene
+- Zaštita od neprimetnog prepisivanja podataka između više uređaja
+- Detekcija konflikta pri istovremenim izmenama
+
+### 6. Bezbednost i autentifikacija
+
+- Firebase Authentication prijava putem e-mail adrese i lozinke
+- Pristup ograničen na vlasnički korisnički nalog
+- Promena lozinke
+- Opcija za oporavak zaboravljene lozinke
+- Firestore bezbednosna pravila ograničavaju pristup podacima na UID vlasnika
+
+### 7. Rad bez internet konekcije
+
+Aplikacija koristi IndexedDB za čuvanje lokalne kopije poslednjih sinhronizovanih podataka.
+
+U offline režimu omogućeni su:
+- Pregled prethodno učitanih podataka
+- Korišćenje aplikacije bez ponovnog preuzimanja podataka
+
+Izmene podataka zahtevaju aktivnu internet konekciju.
+
+---
+
+## Lična vozila
+
+Modul **Lična vozila** predstavlja zasebnu funkcionalnu celinu namenjenu evidenciji privatnih vozila i njihovog održavanja.
+
+Podaci ovog modula potpuno su odvojeni od poslovne evidencije auto-servisa.
+
+**Karakteristike:**
+- Evidencija privatnih vozila
+- Pojedinačna servisna istorija za svako vozilo
+- Evidencija datuma i kilometraže
+- Kategorija odnosno tip servisa
+- Naslov i detaljan opis radova
+- Evidencija troškova u RSD ili EUR
+- Uvoz i izvoz podataka u JSON formatu
+- Automatsko preskakanje duplikata prilikom uvoza
+
+**Odvojena struktura podataka:**
+
+- Poslovna evidencija: `autodesk_users/{uid}`
+- Lična vozila: `autodesk_private/{uid}`
+
+Modul Lična vozila ne učitava podatke o klijentima, radnim nalozima i podešavanjima radionice, čime se obezbeđuje potpuna funkcionalna i podatkovna izolacija.
+
+Za korišćenje ovog modula potrebno je objaviti odgovarajuća Firestore pravila iz datoteke `firestore.rules`.
+
+---
 
 ## Tehnologije
 
-- HTML, CSS i JavaScript bez framework-a i bez build koraka
-- Firebase Authentication i Cloud Firestore (compat SDK, učitava se sa `gstatic.com`)
-- IndexedDB (lokalna kopija za pregled bez interneta)
-- Service Worker i web manifest (PWA)
-- GitHub Pages za hosting (`CNAME` za sopstveni domen)
+Projekat je razvijen korišćenjem standardnih web tehnologija, bez frontend framework-a i bez potrebe za build procesom.
+
+| Tehnologija | Namena |
+|---|---|
+| HTML5 | Struktura aplikacije |
+| CSS3 | Dizajn i responzivni interfejs |
+| JavaScript | Poslovna logika i korisničke funkcionalnosti |
+| Firebase Authentication | Autentifikacija korisnika |
+| Cloud Firestore | Cloud baza podataka |
+| IndexedDB | Lokalna kopija podataka |
+| Service Worker | Offline podrška i keširanje |
+| Web Manifest | PWA instalacija |
+| GitHub Pages | Hosting aplikacije |
+
+Firebase se koristi putem kompatibilnog (compat) SDK-a koji se učitava sa Google CDN infrastrukture (`gstatic.com`).
+
+---
 
 ## Struktura projekta
 
+```text
+AutoDesk/
+│
+├── index.html             # Osnovna HTML stranica
+├── app.js                 # Korisnički interfejs i logika prikaza
+├── local-api.js           # Obrada podataka, validacija i statistika
+├── cloud-sync.js          # Firebase autentifikacija i sinhronizacija
+├── print-docs.js          # Generisanje dokumenata za štampu
+├── firebase-config.js     # Firebase konfiguracija i UID vlasnika
+├── firestore.rules        # Firestore bezbednosna pravila
+│
+├── sw.js                  # Service Worker
+├── manifest.json          # PWA konfiguracija
+│
+├── icons/                 # Ikonice aplikacije
+├── slike/                 # Grafički materijali
+│
+└── UPUTSTVO.md            # Detaljno uputstvo za instalaciju
 ```
-index.html          Osnovna stranica
-app.js              Korisnički interfejs (stranice, forme, modali)
-local-api.js        "API" nad Firestore bazom: pravila, provera unosa, statistika, kopije
-cloud-sync.js       Firebase prijava i čuvanje u Firestore (verzije, fotografije, kopije)
-print-docs.js       Dokumenti za štampu / PDF
-firebase-config.js  Javna Firebase podešavanja i UID vlasnika
-firestore.rules     Firestore pravila (pristup samo vlasniku)
-sw.js, manifest.json, icons/, slike/   PWA i grafika
-UPUTSTVO.md         Detaljno uputstvo za postavljanje i održavanje
-```
 
-## Podešavanje (kratko)
+---
 
-1. U Firebase konzoli napravite projekat, uključite **Authentication (Email/Password)** i **Cloud Firestore**.
-2. Napravite jedan korisnički nalog (vlasnik) i kopirajte njegov UID.
-3. U `firebase-config.js` upišite podešavanja Firebase web aplikacije i `ownerUid`.
-4. U `firestore.rules` postavite isti UID i objavite pravila.
-5. Na GitHub-u uključite **Pages** (grana `main`, folder `/ (root)`).
+## Instalacija i podešavanje
 
-Detaljan postupak i ažuriranje postojeće instalacije su u [UPUTSTVO.md](UPUTSTVO.md).
+### 1. Firebase konfiguracija
+
+Za rad aplikacije potreban je Firebase projekat sa sledećim servisima:
+
+- Firebase Authentication – uključena Email/Password autentifikacija
+- Cloud Firestore – aktivirana baza podataka
+
+Firebase konfiguracija se definiše u datoteci `firebase-config.js`.
+
+Potrebni parametri uključuju:
+
+- `apiKey`
+- `authDomain`
+- `projectId`
+- `storageBucket`
+- `messagingSenderId`
+- `appId`
+- `ownerUid`
+
+`ownerUid` predstavlja jedinstveni identifikator vlasničkog naloga.
+
+### 2. Firestore bezbednosna pravila
+
+Datoteka `firestore.rules` sadrži pravila kojima se pristup bazi ograničava na autentifikovanog vlasnika.
+
+Pravila moraju biti objavljena u Firebase konzoli, u sekciji:
+
+`Firestore Database → Rules`
+
+Prilikom konfiguracije potrebno je koristiti isti vlasnički UID koji je definisan u `firebase-config.js`.
+
+Posebna pravila obezbeđuju pristup i zasebnoj kolekciji `autodesk_private`, koja se koristi za modul Lična vozila.
+
+### 3. GitHub Pages hosting
+
+Aplikacija ne zahteva serversko okruženje, Node.js na produkcionom serveru niti build proces.
+
+Za objavljivanje je dovoljno:
+
+1. Postaviti projektne datoteke u GitHub repozitorijum.
+2. Uključiti GitHub Pages.
+3. Izabrati granu `main` i direktorijum `/ (root)`.
+4. Sačekati objavljivanje aplikacije.
+
+Za korišćenje sopstvenog domena podržana je konfiguracija putem `CNAME` datoteke.
+
+Detaljno uputstvo za inicijalno postavljanje, konfiguraciju i ažuriranje aplikacije nalazi se u datoteci [UPUTSTVO.md](https://github.com/Wolf2109/AutoDesk/blob/main/UPUTSTVO.md).
+
+---
 
 ## Lokalno pokretanje
 
-Aplikacija je statična; dovoljan je bilo koji lokalni web server (Service Worker i Firebase ne rade sa `file://`):
+Za lokalno testiranje potreban je jednostavan HTTP server. Direktno otvaranje HTML datoteke putem `file://` protokola nije podržano zbog ograničenja Service Worker-a i Firebase servisa.
+
+**Opcija 1 – Node.js:**
 
 ```bash
 npx serve .
-# ili
+```
+
+**Opcija 2 – Python:**
+
+```bash
 python3 -m http.server 8080
 ```
 
-Zatim otvorite `http://localhost:8080`. Za prijavu je potreban ispravan `firebase-config.js`, a `localhost` mora biti u listi dozvoljenih domena u Firebase Authentication podešavanjima.
+Nakon pokretanja servera aplikacija je dostupna na:
 
-## Kako se podaci čuvaju
+```text
+http://localhost:8080
+```
 
-Podaci su u kolekciji `autodesk_users/{uid}`:
+Za autentifikaciju je neophodna ispravna Firebase konfiguracija, a domen `localhost` mora biti dodat u listu dozvoljenih domena u Firebase Authentication podešavanjima.
+
+---
+
+## Struktura podataka u Firestore bazi
+
+Poslovna evidencija čuva se u kolekciji:
+
+`autodesk_users/{uid}`
 
 | Putanja | Sadržaj |
-| --- | --- |
-| `sync/meta` | verzija i pokazivač na trenutnu evidenciju |
-| `sync/{prefiks}{i}` | evidencija (klijenti, vozila, nalozi, cenovnik, podešavanja) kao JSON podeljen u delove, bez fotografija |
-| `photos/{id}` | jedna smanjena fotografija |
-| `backups/{ime}` i `backups/{ime}/chunks/{i}` | rezervne kopije |
+|---|---|
+| `sync/meta` | Verzija podataka i pokazivač na aktuelnu evidenciju |
+| `sync/{prefiks}{i}` | Evidencija klijenata, vozila, radnih naloga, cenovnika i podešavanja |
+| `photos/{id}` | Pojedinačne optimizovane fotografije |
+| `backups/{ime}` | Metapodaci rezervnih kopija |
+| `backups/{ime}/chunks/{i}` | Delovi rezervnih kopija |
 
-Svaka izmena prvo proverava verziju u oblaku i čuva se samo ako se poklapa. Provera oblaka je jedno čitanje u minuti, pa je potrošnja daleko ispod besplatne dnevne kvote za jednu radionicu.
+Glavna evidencija serijalizuje se u JSON format i deli na manje delove radi efikasnijeg čuvanja u Firestore bazi. Fotografije se čuvaju odvojeno.
 
-## Bezbednost
+Lična vozila koriste zaseban koren:
 
-- `apiKey` u `firebase-config.js` je javna po dizajnu; zaštitu čine **Firestore pravila** koja dozvoljavaju pristup samo vlasničkom UID-u.
-- Ne postavljajte na javni repozitorijum privatne podatke: JSON izvoze, kopije baze ili spiskove klijenata.
-- Preporuka: redovno preuzimajte „Izvezi JSON“ kao privatnu kopiju (kopije u aplikaciji ne sadrže fotografije).
+`autodesk_private/{uid}`
+
+U njemu se vozila i servisni unosi čuvaju kao pojedinačni dokumenti.
+
+### Sinhronizacija i kontrola verzija
+
+Pre svake izmene proverava se aktuelna verzija podataka u Firestore bazi.
+
+Izmena se prihvata samo ako se lokalno očekivana verzija poklapa sa verzijom u oblaku. U suprotnom se prijavljuje konflikt i zahteva ponovno učitavanje podataka pre ponavljanja izmene.
+
+Provera verzije ograničena je na jedno čitanje u minuti, čime se smanjuje potrošnja Firestore resursa.
+
+---
+
+## Bezbednost i privatnost podataka
+
+- Firebase `apiKey` je javni konfiguracioni podatak i sam po sebi ne predstavlja bezbednosnu prepreku.
+- Stvarna kontrola pristupa ostvaruje se putem Firestore Security Rules pravila.
+- Pristup poslovnim i privatnim podacima ograničen je na odgovarajući autentifikovani UID.
+- Privatni JSON izvozi i rezervne kopije baze ne bi trebalo da se objavljuju u javnom GitHub repozitorijumu.
+- Preporučuje se redovno čuvanje lokalne JSON kopije kompletne evidencije, uključujući fotografije.
+
+**Napomena:** Rezervne kopije koje se automatski generišu unutar aplikacije ne sadrže fotografije. Za kompletnu arhivu potrebno je koristiti funkciju `Izvezi JSON`.
+
+---
 
 ## Ograničenja
 
-- Jedan vlasnik / jedan nalog; nema uloga ni više korisnika.
-- Izmene su moguće samo uz internet vezu.
-- Preporučeno je da se ne radi istovremeno na dva uređaja; aplikacija će sukob otkriti i tražiti ponavljanje izmene.
-- Brojevi strana u PDF-u prikazuju se u Chrome-u i Edge-u.
-- Konverzija RSD ↔ EUR koristi fiksni kurs 1 EUR = 120 RSD.
+- Sistem je namenjen jednom vlasničkom nalogu.
+- Nisu implementirane korisničke uloge niti podrška za više zaposlenih sa zasebnim nalozima.
+- Izmene podataka zahtevaju internet konekciju.
+- Istovremeni rad na više uređaja nije preporučen zbog mogućih konflikata pri sinhronizaciji.
+- Pregled prethodno sinhronizovanih podataka dostupan je i bez interneta.
+- Brojevi stranica u dokumentima za štampu podržani su u pregledačima Google Chrome i Microsoft Edge.
+- Konverzija između RSD i EUR koristi fiksni kurs od **1 EUR = 120 RSD**.
+
+---
 
 ## Licenca
 
-Privatni projekat radionice. Sva prava zadržana, osim ako vlasnik ne odluči drugačije.
+**Privatni projekat – sva prava zadržana.**
 
-## Lična vozila (zasebna celina)
-
-Stavka menija **Lična vozila** služi za evidenciju privatnih vozila i njihovih servisa. Potpuno je odvojena od evidencije radionice:
-
-- podaci se čuvaju u posebnom korenu baze `autodesk_private/{uid}` (vozila i unosi su pojedinačni dokumenti), a radionica ostaje u `autodesk_users/{uid}`
-- stranica ne učitava klijente, naloge ni podešavanja radionice i obrnuto
-- uvoz i izvoz JSON-a (`Datum`, `Kilometraža`, `Tip`, `Naslov`, `Opis / beleške`, `Iznos`, `Valuta`); duplikati se pri uvozu preskaču
-- novo Firestore pravilo je u `firestore.rules` — **objavite ga u Firebase konzoli (Firestore Database → Rules)**, inače lična vozila neće moći da se učitaju
+Projekat AutoDesk razvijen je za potrebe interne evidencije i poslovanja auto-servisa. Nije objavljen pod licencom otvorenog koda. Sva prava na izvorni kod, dizajn i funkcionalnosti zadržava vlasnik projekta.
