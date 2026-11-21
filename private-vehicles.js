@@ -39,7 +39,7 @@ const PrivateVehicles = (() => {
     /* ---------- prikaz ---------- */
 
     async function render() {
-        await PrivateCache.ensureFirst();
+        await PrivateCache.ensureFirst('service');
         await load();
         const v = current();
         const tabs = pv.vehicles.map(x => `<button class="${x.id === pv.selected ? 'active' : ''}" data-pvtab="${esc(x.id)}">${esc(x.name)}${x.registration ? ' · ' + esc(x.registration) : ''}</button>`).join('');
@@ -79,7 +79,7 @@ const PrivateVehicles = (() => {
         }
 
         $('#content').innerHTML = `
-            ${PrivateCache.bar()}
+            ${PrivateCache.bar('service')}
             <div class="toolbar">
                 <div class="search-wrapper"><input class="search" id="pvSearch" placeholder="Pretraži servise…" value="${esc(pv.q)}"></div>
                 <div style="display:flex; gap:8px; flex-wrap:wrap;">
@@ -92,7 +92,7 @@ const PrivateVehicles = (() => {
             ${tabs ? `<div class="pvTabs">${tabs}</div>` : ''}
             ${body}`;
 
-        PrivateCache.bind(render);
+        PrivateCache.bind(render, 'service');
         document.querySelectorAll('[data-pvtab]').forEach(b => b.onclick = () => { pv.selected = b.dataset.pvtab; pv.q = ''; render().catch(e => toast(e.message)); });
         $('#pvAddVehicle').onclick = () => vehicleForm();
         $('#pvAddEntry').onclick = () => entryForm();

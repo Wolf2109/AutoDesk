@@ -32,7 +32,7 @@ const FuelTracker = (() => {
     /* ---------- prikaz ---------- */
 
     async function render() {
-        await PrivateCache.ensureFirst();
+        await PrivateCache.ensureFirst('fuel');
         await load();
         const years = [...new Set(st.all.map(e => e.date.slice(0, 4)))].sort().reverse();
         const list = st.all.filter(e => !st.year || e.date.startsWith(st.year));
@@ -40,7 +40,7 @@ const FuelTracker = (() => {
 
         if (!years.includes(st.mYear)) st.mYear = st.year || years[0] || '';
         $('#content').innerHTML = `
-            ${PrivateCache.bar()}
+            ${PrivateCache.bar('fuel')}
             <div class="toolbar">
                 <div class="subtle" style="align-self:center">Praćenje goriva (sva vozila zajedno)</div>
                 <div style="display:flex; gap:8px; flex-wrap:wrap;">
@@ -53,7 +53,7 @@ const FuelTracker = (() => {
             ${tabs}
             ${list.length ? body(list) : '<section class="panel"><div class="empty">Još nema unosa goriva.<br>Dodajte unos, uvezite JSON ili pritisnite „Sinhronizuj“.</div></section>'}`;
 
-        PrivateCache.bind(render);
+        PrivateCache.bind(render, 'fuel');
         document.querySelectorAll('[data-fy]').forEach(b => b.onclick = () => { st.year = b.dataset.fy; if (st.year) st.mYear = st.year; st.limit = 30; render().catch(e => toast(e.message)); });
         $('#fuAdd').onclick = () => entryForm();
         $('#fuImport').onclick = () => $('#fuFile').click();

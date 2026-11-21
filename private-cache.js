@@ -9,13 +9,17 @@
  */
 const PrivateCache = (() => {
     const KEY = 'autodesk_private_cache_v1';
-    const KINDS = { vehicles: 'vehicles', entries: 'entries', fuel: 'fuel' };
-    const empty = () => ({ vehicles: [], entries: [], fuel: [], syncedAt: 0 });
-    let mem = null, rerender = null;
+    // Dve odvojene grupe: 'service' (vozila + servisi) i 'fuel' (gorivo), svaka sa svojom sinhronizacijom.
+    const GROUPS = { service: ['vehicles', 'entries'], fuel: ['fuel'] };
+    const empty = () => ({ vehicles: [], entries: [], fuel: [], syncedAt: { service: 0, fuel: 0 } });
+    let mem = null, rerender = null, barKind = 'fuel';
 
     function load() {
         if (mem) return mem;
         try { mem = { ...empty(), ...JSON.parse(localStorage.getItem(KEY) || '{}') }; } catch (e) { mem = empty(); }
+        // stara kopija je imala jedno vreme sinhronizacije za sve
+        if (typeof mem.syncedAt === 'number') mem.syncedAt = { service: mem.syncedAt, fuel: mem.syncedAt };
+        mem.syncedAt = { service: 0, fuel: 0, ...mem.syncedAt };
         return mem;
     }
     function save() {
@@ -25,19 +29,22 @@ const PrivateCache = (() => {
 
     const strip = d => { const { created, ...rest } = d.data(); return { id: d.id, ...rest }; };
 
-    async function sync() {
+    /** Povlači samo jednu grupu iz Firebase-a; druga ostaje netaknuta. */
+    async function sync(kind) {
+        if (!GROUPS[kind]) throw Error('Nepoznata grupa podataka.');
         if (!navigator.onLine) throw Error('Nema internet veze.');
-        const root = CloudSync.privateRoot();
-        const [v, e, f] = await Promise.all(Object.values(KINDS).map(n => root.collection(n).get()));
-        mem = { vehicles: v.docs.map(strip), entries: e.docs.map(strip), fuel: f.docs.map(strip), syncedAt: Date.now() };
+        const root = CloudSync.privateRoot(), c = load();
+        const snaps = await Promise.all(GROUPS[kind].map(n => root.collection(n).get()));
+        GROUPS[kind].forEach((n, i) => { c[n] = snaps[i].docs.map(strip); });
+        c.syncedAt[kind] = Date.now();
         save();
-        return mem;
+        return c;
     }
 
     /** Prvo otvaranje (nema kopije): jednom povuci podatke automatski, ako ima interneta. */
-    async function ensureFirst() {
-        if (load().syncedAt || !navigator.onLine) return;
-        try { await sync(); } catch (e) { console.warn('Prva sinhronizacija nije uspela:', e.message); }
+    async function ensureFirst(kind) {
+        if (load().syncedAt[kind] || !navigator.onLine) return;
+        try { await sync(kind); } catch (e) { console.warn('Prva sinhronizacija nije uspela:', e.message); }
     }
 
     function upsert(kind, item) {
@@ -53,21 +60,21 @@ const PrivateCache = (() => {
 
     const when = ms => new Date(ms).toLocaleString('sr-Latn-RS', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
 
-    function bar() {
-        const t = load().syncedAt, on = navigator.onLine;
+    function bar(kind = barKind) {
+        const t = load().syncedAt[kind], on = navigator.onLine;
         return `<div class="syncBar"><div class="syncInfo"><i class="syncDot ${on ? 'on' : 'off'}"></i><span>${t ? 'Sinhronizovano: ' + when(t) : 'Još nije sinhronizovano'}${on ? '' : ' · bez interneta (samo pregled)'}</span></div>` +
             `<button class="secondary" id="syncBtn" ${on ? '' : 'disabled'}>⟳ Sinhronizuj</button></div>`;
     }
 
-    function bind(fn) {
-        rerender = fn;
+    function bind(fn, kind) {
+        rerender = fn; barKind = kind;
         const b = document.getElementById('syncBtn');
         if (!b) return;
         b.onclick = async () => {
             b.disabled = true; b.textContent = 'Sinhronizacija…';
             try {
-                const c = await sync();
-                toast(`Sinhronizovano: ${c.vehicles.length} vozila, ${c.entries.length} servisa, ${c.fuel.length} unosa goriva.`);
+                const c = await sync(kind);
+                toast(kind === 'fuel' ? `Gorivo sinhronizovano: ${c.fuel.length} unosa.` : `Servisi sinhronizovani: ${c.vehicles.length} vozila, ${c.entries.length} unosa.`);
                 await rerender();
             } catch (e) {
                 toast('Sinhronizacija nije uspela: ' + e.message);
@@ -80,8 +87,8 @@ const PrivateCache = (() => {
     const refreshBar = () => {
         const el = document.querySelector('.syncBar');
         if (!el || !rerender) return;
-        el.outerHTML = bar();
-        bind(rerender);
+        el.outerHTML = bar(barKind);
+        bind(rerender, barKind);
     };
     window.addEventListener('online', refreshBar);
     window.addEventListener('offline', refreshBar);
