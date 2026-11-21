@@ -773,9 +773,9 @@ button { touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
     .entTbl td:empty { display: none; }
     .entTbl td.cAct { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px; padding-top: 12px; border-top: 1px solid var(--line); }
 
-    /* prozori kao donji panel */
-    .modal { align-items: flex-end; padding: 0; }
-    .dialog { width: 100%; max-height: calc(100dvh - 24px); border-radius: 20px 20px 0 0; padding: 0 16px calc(18px + env(safe-area-inset-bottom)); overscroll-behavior: contain; animation: sheetUp .2s ease-out; }
+    /* prozori centrirani na ekranu */
+    .modal { align-items: center; padding: calc(12px + env(safe-area-inset-top)) 12px calc(12px + env(safe-area-inset-bottom)); }
+    .dialog { width: 100%; max-height: 100%; border-radius: 20px; padding: 0 16px 18px; overscroll-behavior: contain; animation: dialogIn .18s ease-out; }
     .modalTop { position: sticky; top: 0; z-index: 2; margin: 0 -16px 14px; padding: 14px 16px 10px; background: var(--secondary); }
     .modalTop h2 { font-size: 19px; }
     .iconBtn { width: 40px; height: 40px; flex: none; }
@@ -787,7 +787,7 @@ button { touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
 
     #toast { left: 12px; right: 12px; bottom: calc(14px + env(safe-area-inset-bottom)); max-width: none; }
 }
-@keyframes sheetUp { from { transform: translateY(28px); opacity: 0; } }
+@keyframes dialogIn { from { transform: scale(.97); opacity: 0; } }
 
 /* ---------- Lična vozila ---------- */
 .pvTabs { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 18px; }
@@ -837,4 +837,65 @@ button { touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
     .tableWrap.cards .pvTbl .pvDash { display: none; }
     .tableWrap.cards .pvTbl tbody tr td.cAct { grid-column: 1 / -1; grid-row: 2; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 4px; padding-top: 12px; border-top: 1px solid var(--line); }
     .tableWrap.cards .pvTbl td.cAct button { margin: 0; }
+}
+
+/* ---------- Gorivo ---------- */
+.fuBars { display: flex; align-items: flex-end; gap: 8px; height: 220px; overflow-x: auto; padding: 4px 2px 0; scrollbar-width: thin; }
+.fb { flex: 1 0 34px; max-width: 64px; height: 100%; display: flex; flex-direction: column; justify-content: flex-end; align-items: stretch; gap: 4px; }
+.fb .fstack { display: flex; flex-direction: column-reverse; border-radius: 4px 4px 0 0; overflow: hidden; min-height: 2px; }
+.fb .fstack i { display: block; }
+.fb .fv { font-size: 10px; color: var(--muted); text-align: center; font-variant-numeric: tabular-nums; }
+.fb .fl { font-size: 10px; color: var(--muted); text-align: center; padding-top: 4px; border-top: 1px solid var(--line); }
+.fuTbl td.r, .fuTbl th.r { text-align: right; }
+.fuTbl td.fAct { white-space: nowrap; }
+.fuTbl td.fAct button { margin-right: 6px; }
+
+@media (max-width: 760px) {
+    #content > .toolbar #fuAdd { flex-basis: 100%; order: -1; }
+    #content > .toolbar #fuImport, #content > .toolbar #fuExport { flex: 1 1 calc(50% - 4px); }
+    .fuBars { height: 190px; }
+    .tableWrap.cards .fuTbl tbody tr { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px 14px; align-items: start; padding: 14px; margin-bottom: 12px; }
+    .tableWrap.cards .fuTbl tbody tr td.fProd,
+    .tableWrap.cards .fuTbl tbody tr td.fL,
+    .tableWrap.cards .fuTbl tbody tr td.fPpl,
+    .tableWrap.cards .fuTbl tbody tr td.fPts { display: none; }
+    .tableWrap.cards .fuTbl tbody tr td.fDate { grid-column: 1; grid-row: 1; display: block; text-align: left; }
+    .tableWrap.cards .fuTbl tbody tr td.fDate strong { font: 600 15px/1.3 'Sora', system-ui, sans-serif; }
+    .tableWrap.cards .fuTbl .pvMeta { display: block; margin-top: 4px; font-size: 12px; color: var(--muted); line-height: 1.5; }
+    .tableWrap.cards .fuTbl tbody tr td.fPrice { grid-column: 2; grid-row: 1; display: block; text-align: right; white-space: nowrap; font-size: 14px; color: var(--gold); }
+    .tableWrap.cards .fuTbl tbody tr td.fAct { grid-column: 1 / -1; grid-row: 2; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 4px; padding-top: 12px; border-top: 1px solid var(--line); }
+    .tableWrap.cards .fuTbl td.fAct button { margin: 0; }
+}
+
+.statsGrid.fuStats { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+@media (max-width: 760px) { .statsGrid.fuStats { grid-template-columns: repeat(2, minmax(0, 1fr)); } .fuStats .stat small { overflow-wrap: anywhere; } }
+
+/* pregledi po vrsti goriva i po godinama (redovi umesto tabele) */
+.fuTwo > * { min-width: 0; }
+.fuSum { font-size: 13px; }
+.fsHead, .fsRow { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(0, .7fr) minmax(0, 1fr) minmax(0, 1.3fr) minmax(0, .8fr); gap: 8px; align-items: baseline; padding: 9px 0; }
+.fsHead { color: var(--muted); font-size: 10.5px; letter-spacing: .5px; text-transform: uppercase; border-bottom: 1px solid var(--line-strong); }
+.fsHead span, .fsRow span { text-align: right; font-variant-numeric: tabular-nums; }
+.fsRow { border-bottom: 1px solid var(--line); }
+.fsRow:last-child { border-bottom: 0; }
+.fsName { overflow-wrap: anywhere; }
+@media (max-width: 1100px) { .fuTwo { grid-template-columns: 1fr; } }
+@media (max-width: 760px) {
+    #content { min-width: 0; max-width: 100%; }
+    .fuPanel { padding: 16px; overflow: hidden; }
+    .fuPanel h3 { font-size: 15px; margin-bottom: 12px; }
+    .fuPanel .legend { flex-wrap: wrap; gap: 6px 14px; }
+    .fuPanel .legend span { white-space: nowrap; }
+    .fsHead { display: none; }
+    .fsRow { grid-template-columns: 1fr 1fr; gap: 8px 12px; padding: 12px 0; }
+    .fsRow .fsName { grid-column: 1 / -1; font-size: 14px; }
+    .fsRow span { text-align: left; font-weight: 600; }
+    .fsRow span::before { content: attr(data-l); display: block; font-weight: 400; font-size: 11px; color: var(--muted); margin-bottom: 2px; }
+    .fuStats .stat label { font-size: 11px; }
+    .fuStats .bigNumber { font-size: 19px; overflow-wrap: anywhere; }
+}
+@media (max-width: 760px) {
+    .fuStats .stat { padding: 14px; min-height: 0; }
+    .fuStats .stat small { display: block; margin-top: 4px; line-height: 1.35; }
+    .fsRow { padding: 10px 0; gap: 6px 12px; }
 }
