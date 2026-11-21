@@ -54,7 +54,7 @@ const PrivateVehicles = (() => {
             const totalsHtml = Object.keys(totals).length
                 ? Object.entries(totals).map(([c, s]) => `<div><small>Ukupno (${esc(c)})</small><strong>${money(s, c)}</strong></div>`).join('')
                 : '';
-            body = `<section class="panel">
+            body = `<section class="panel pvPanel">
                 <div class="pvSummary">
                     <div>
                         <h3 style="margin:0">${esc(v.name)}</h3>
@@ -73,7 +73,7 @@ const PrivateVehicles = (() => {
                     </div>
                 </div>
             </section>
-            <section class="panel" id="pvTable"></section>`;
+            <section class="panel pvPanel" id="pvTable"></section>`;
         }
 
         $('#content').innerHTML = `
@@ -109,15 +109,23 @@ const PrivateVehicles = (() => {
         const q = pv.q.toLowerCase().trim();
         const rows = entriesOf(v.id).filter(e => !q || [e.title, e.notes, e.type, e.date].some(x => String(x || '').toLowerCase().includes(q)));
         box.innerHTML = rows.length
-            ? `<div class="tableWrap cards"><table class="entTbl"><thead><tr><th>Datum</th><th>Kilometraža</th><th>Tip</th><th>Naslov i beleške</th><th>Iznos</th><th></th></tr></thead><tbody>${rows.map(e => `<tr>
-                <td data-label="Datum">${fdate(e.date)}</td>
-                <td data-label="Kilometraža">${km(e.km)}</td>
-                <td data-label="Tip">${esc(e.type)}</td>
-                <td data-label="Naslov"><strong>${esc(e.title)}</strong>${e.notes ? `<div class="pvNotes">${esc(e.notes)}</div>` : ''}</td>
-                <td data-label="Iznos">${Number(e.amount) ? money(e.amount, e.currency) : '—'}</td>
-                <td><button class="secondary" data-pvedit="${esc(e.id)}">Izmeni</button> <button class="danger" data-pvdel="${esc(e.id)}">Obriši</button></td>
-            </tr>`).join('')}</tbody></table></div>`
+            ? `<div class="tableWrap cards"><table class="pvTbl"><thead><tr><th>Datum</th><th>Kilometraža</th><th>Tip</th><th>Naslov i beleške</th><th>Iznos</th><th></th></tr></thead><tbody>${rows.map(e => {
+                const long = (e.notes || '').split('\n').length > 3 || (e.notes || '').length > 160;
+                return `<tr>
+                <td class="cDate">${fdate(e.date)}</td>
+                <td class="cKm">${km(e.km)}</td>
+                <td class="cType">${esc(e.type)}</td>
+                <td class="cTitle"><strong>${esc(e.title)}</strong>
+                    <div class="pvMeta">${[fdate(e.date), e.km || e.km === 0 ? km(e.km) : '', e.type].filter(Boolean).map(esc).join(' · ')}</div>
+                    ${e.notes ? `<div class="pvNotes ${long ? 'clamp' : ''}">${esc(e.notes)}</div>${long ? '<button type="button" class="pvToggle">Prikaži više</button>' : ''}` : ''}</td>
+                <td class="cAmount">${Number(e.amount) ? money(e.amount, e.currency) : '<span class="pvDash">—</span>'}</td>
+                <td class="cAct"><button class="secondary" data-pvedit="${esc(e.id)}">Izmeni</button><button class="danger" data-pvdel="${esc(e.id)}">Obriši</button></td>
+            </tr>`; }).join('')}</tbody></table></div>`
             : `<div class="empty">${q ? 'Nema rezultata pretrage.' : 'Za ovo vozilo još nema unosa.'}</div>`;
+        box.querySelectorAll('.pvToggle').forEach(b => b.onclick = () => {
+            const n = b.previousElementSibling, open = n.classList.toggle('clamp');
+            b.textContent = open ? 'Prikaži više' : 'Prikaži manje';
+        });
         box.querySelectorAll('[data-pvedit]').forEach(b => b.onclick = () => entryForm(pv.entries.find(x => x.id === b.dataset.pvedit)));
         box.querySelectorAll('[data-pvdel]').forEach(b => b.onclick = async () => {
             if (!confirm('Obrisati ovaj unos?')) return;
