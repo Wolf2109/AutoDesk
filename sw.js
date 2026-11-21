@@ -1,6 +1,6 @@
 'use strict';
-const CACHE = 'autodesk-ui-20261116-v4';
-const FILES = ['./', './index.html', './style.css', './app.js', './print-docs.js', './local-api.js', './cloud-sync.js', './manifest.json', './favicon.ico', './slike/logo.png', './icons/icon-192.png', './icons/icon-512.png'];
+const CACHE = 'autodesk-ui-20261121-v5';
+const FILES = ['./', './index.html', './style.css', './app.js', './print-docs.js', './local-api.js', './cloud-sync.js', './private-vehicles.js', './manifest.json', './favicon.ico', './slike/logo.png', './icons/icon-192.png', './icons/icon-512.png'];
 const SDK = 'https://www.gstatic.com/firebasejs/';
 
 self.addEventListener('install', e => e.waitUntil(caches.open(CACHE).then(c => c.addAll(FILES)).then(() => self.skipWaiting())));

@@ -171,7 +171,13 @@ const CloudSync = (() => {
     await u.updatePassword(next);
   }
 
+  /* ---------- lična vozila (zasebna celina) ----------
+   * Potpuno odvojen koren u bazi: autodesk_private/{uid}/vehicles i /entries.
+   * Ne dodiruje autodesk_users/{uid} (radni nalozi, klijenti, fotografije, kopije). */
+  const privateRoot = () => db.collection('autodesk_private').doc(user().uid);
+
   return {
+    privateRoot, privateDb: () => db, privateBatchDelete: batchDelete, privateStamp: stamp,
     ready, getMeta, loadState, saveState, putPhoto, getPhoto, deletePhotos,
     putBackup, listBackups, getBackup, deleteBackup, login, resetPassword, changePassword,
     logout: () => auth?.signOut(),

@@ -788,3 +788,14 @@ button { touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
     #toast { left: 12px; right: 12px; bottom: calc(14px + env(safe-area-inset-bottom)); max-width: none; }
 }
 @keyframes sheetUp { from { transform: translateY(28px); opacity: 0; } }
+
+/* ---------- Lična vozila ---------- */
+.pvTabs { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 18px; }
+.pvTabs button { padding: 8px 14px; border-radius: 999px; border: 1px solid var(--line-strong); background: var(--card); color: var(--text); cursor: pointer; font: inherit; }
+.pvTabs button.active { border-color: var(--gold); color: var(--gold); background: var(--gold-soft); }
+.pvSummary { display: flex; gap: 22px; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; }
+.pvStats { display: flex; gap: 26px; flex-wrap: wrap; margin-top: 10px; }
+.pvStats small { display: block; color: var(--muted); font-size: 12px; }
+.pvStats strong { font-size: 16px; }
+.pvNotes { white-space: pre-line; font-size: 13px; color: var(--muted); }
+.pvActions { display: flex; gap: 8px; flex-wrap: wrap; }

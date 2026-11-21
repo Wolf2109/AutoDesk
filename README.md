@@ -111,3 +111,12 @@ Svaka izmena prvo proverava verziju u oblaku i čuva se samo ako se poklapa. Pro
 ## Licenca
 
 Privatni projekat radionice. Sva prava zadržana, osim ako vlasnik ne odluči drugačije.
+
+## Lična vozila (zasebna celina)
+
+Stavka menija **Lična vozila** služi za evidenciju privatnih vozila i njihovih servisa. Potpuno je odvojena od evidencije radionice:
+
+- podaci se čuvaju u posebnom korenu baze `autodesk_private/{uid}` (vozila i unosi su pojedinačni dokumenti), a radionica ostaje u `autodesk_users/{uid}`
+- stranica ne učitava klijente, naloge ni podešavanja radionice i obrnuto
+- uvoz i izvoz JSON-a (`Datum`, `Kilometraža`, `Tip`, `Naslov`, `Opis / beleške`, `Iznos`, `Valuta`); duplikati se pri uvozu preskaču
+- novo Firestore pravilo je u `firestore.rules` — **objavite ga u Firebase konzoli (Firestore Database → Rules)**, inače lična vozila neće moći da se učitaju

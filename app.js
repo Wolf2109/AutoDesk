@@ -130,6 +130,7 @@ const navItems = [
     ['vehicles', '<svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 16l1.5-5.5A2 2 0 018.4 9h7.2a2 2 0 011.9 1.5L19 16"/><rect x="3" y="16" width="18" height="4" rx="1.5"/></svg>', 'Vozila'],
     ['services', '<svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16M4 12h16M4 18h10"/></svg>', 'Cenovnik'],
     ['stats', '<svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>', 'Statistika'],
+    ['private', '<svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 13l2-5.5A2 2 0 016.9 6h10.2A2 2 0 0119 7.5L21 13"/><path d="M3 13h18v5a1 1 0 01-1 1h-2v-2H6v2H4a1 1 0 01-1-1z"/><circle cx="7.5" cy="15.5" r=".6"/><circle cx="16.5" cy="15.5" r=".6"/></svg>', 'Lična vozila'],
     ['settings', '<svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9L7 7M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1"/></svg>', 'Podešavanja']
 ];
 
@@ -224,6 +225,9 @@ async function navigate(page, keep = false, fromPop = false) {
     $('#menuBtn')?.setAttribute('aria-label', 'Prikaži meni');
     renderNav();
     $('#pageTitle').textContent = navItems.find(x => x[0] === page)?.[2] || 'AutoDesk';
+    const headSmall = document.querySelector('header small');
+    if (headSmall) headSmall.textContent = page === 'private' ? 'Privatno' : 'Radionica';
+    $('#quickOrder')?.classList.toggle('hidden', page === 'private');
 
     // Prazna ili druga stranica: prikaži učitavanje; ista stranica ostaje vidljiva uz traku na vrhu.
     const content = $('#content');
@@ -231,6 +235,12 @@ async function navigate(page, keep = false, fromPop = false) {
     document.body.classList.add('busy');
 
     try {
+        // Lična vozila su zasebna celina: ne učitavaju podatke radionice i ne zavise od njih.
+        if (page === 'private') {
+            await PrivateVehicles.render();
+            if (seq === navSeq) state.renderedPage = page;
+            return;
+        }
         let settings = await api('/settings');
         state.currency = currencies.includes(settings.currency) ? settings.currency : 'RSD';
         state.dateFormat = settings.date_format === 'YYYY-MM-DD' ? 'YYYY-MM-DD' : 'DD.MM.YYYY';
