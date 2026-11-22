@@ -1,0 +1,8 @@
+{
+  "appId": "rs.autodijagnostikalazarevic.autodesk",
+  "appName": "AutoDesk",
+  "webDir": "www",
+  "backgroundColor": "#151e2e",
+  "server": { "androidScheme": "https" },
+  "android": { "allowMixedContent": false }
+}

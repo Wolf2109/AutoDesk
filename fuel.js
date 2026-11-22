@@ -188,11 +188,7 @@ const FuelTracker = (() => {
     function exportJson() {
         const out = st.all.slice().reverse().map(e => ({ 'Datum': e.date, 'Vreme': e.time || '', 'Naziv proizvoda': e.product, 'Litara': e.liters, 'Cena': e.price, 'Bodovi': e.points ?? null, 'RSD/L': Math.round(ppl(e) * 100) / 100 }));
         const d = new Date(), p = x => String(x).padStart(2, '0');
-        const a = document.createElement('a');
-        a.href = URL.createObjectURL(new Blob([JSON.stringify(out, null, 2)], { type: 'application/json' }));
-        a.download = `gorivo-${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}.json`;
-        document.body.appendChild(a); a.click();
-        setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 500);
+        NativeBridge.saveFile(`gorivo-${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}.json`, new Blob([JSON.stringify(out, null, 2)], { type: 'application/json' })).catch(e => toast(e.message));
     }
 
     function parseRows(text) {

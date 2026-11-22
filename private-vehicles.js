@@ -222,12 +222,7 @@ const PrivateVehicles = (() => {
         const d = new Date(), p = n => String(n).padStart(2, '0');
         const slug = (v.registration || v.name || 'vozilo').replace(/[^\w-]+/g, '-').replace(/^-+|-+$/g, '') || 'vozilo';
         const name = `vehicle-export-${slug}-${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}.json`;
-        const a = document.createElement('a');
-        a.href = URL.createObjectURL(new Blob([JSON.stringify(out, null, 2)], { type: 'application/json' }));
-        a.download = name;
-        document.body.appendChild(a);
-        a.click();
-        setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 500);
+        NativeBridge.saveFile(name, new Blob([JSON.stringify(out, null, 2)], { type: 'application/json' })).catch(e => toast(e.message));
     }
 
     const parseRows = text => {

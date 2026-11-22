@@ -249,10 +249,31 @@ footer{border-top:1px solid #DDE2EA;margin-top:28px;padding-top:10px;color:#6670
     return frame(ctx, { title: 'SERVISNA KNJIŽICA', number: v.name || 'Vozilo', meta: [v.registration || '', 'Unosa: ' + list.length].filter(Boolean), body });
   }
 
-  /** Lična vozila: isti izgled dokumenta, ali bez zaglavlja i podataka radionice. Pozvati direktno iz klika. */
-  function previewPrivate(vehicle, entries) {
+  /** Pregledač: nova kartica. Android aplikacija: „prozor“ koji po završetku otvara sistemsku štampu / Sačuvaj kao PDF. */
+  function openTarget() {
+    if (window.NativeBridge && NativeBridge.isNative()) {
+      let buf = '';
+      return {
+        document: {
+          open() { buf = ''; },
+          write(h) { buf += h; },
+          close() {
+            if (buf.includes('Priprema dokumenta')) return;
+            const title = (buf.match(/<title>([^<]*)<\/title>/) || [])[1] || 'AutoDesk';
+            NativeBridge.printHtml(buf, title).catch(e => toast(e.message));
+          },
+          get body() { return { set textContent(m) { toast(m); } }; }
+        }
+      };
+    }
     const w = window.open('', '_blank');
     if (!w) throw Error('Dozvolite otvaranje novih kartica za pregled dokumenta.');
+    return w;
+  }
+
+  /** Lična vozila: isti izgled dokumenta, ali bez zaglavlja i podataka radionice. Pozvati direktno iz klika. */
+  function previewPrivate(vehicle, entries) {
+    const w = openTarget();
     w.document.write('<!doctype html><meta charset="utf-8"><title>AutoDesk</title><body style="font:14px Arial;padding:30px;color:#444">Priprema dokumenta…</body>');
     w.document.close();
     logoData()
@@ -265,8 +286,7 @@ footer{border-top:1px solid #DDE2EA;margin-top:28px;padding-top:10px;color:#6670
 
   /** Mora se pozvati direktno iz klika (inače pregledač blokira novu karticu). */
   function preview(url) {
-    const w = window.open('', '_blank');
-    if (!w) throw Error('Dozvolite otvaranje novih kartica za pregled dokumenta.');
+    const w = openTarget();
     w.document.write('<!doctype html><meta charset="utf-8"><title>AutoDesk</title><body style="font:14px Arial;padding:30px;color:#444">Priprema dokumenta…</body>');
     w.document.close();
     render(url, w).catch(e => { w.document.body.textContent = 'Greška: ' + e.message; });

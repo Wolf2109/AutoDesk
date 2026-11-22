@@ -978,14 +978,7 @@ async function download(url, name) {
         }
         const blob = await api(url);
         if (!(blob instanceof Blob)) throw Error('Izvoz nije vratio datoteku.');
-        const href = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = href;
-        a.download = name;
-        document.body.append(a);
-        a.click();
-        a.remove();
-        setTimeout(() => URL.revokeObjectURL(href), 1000);
+        await NativeBridge.saveFile(name, blob);
     } catch (e) { toast(e.message); }
 }
 
@@ -1037,7 +1030,7 @@ async function settingsPage() {
         }
     };
     
-    $('#exportAll').onclick = async () => { try { const blob=await LocalAPI.exportAll(), u=URL.createObjectURL(blob), a=document.createElement('a'); a.href=u; a.download='autodesk-evidencija.json'; a.click(); setTimeout(()=>URL.revokeObjectURL(u),1000); } catch(e){toast(e.message);} };
+    $('#exportAll').onclick = async () => { try { const blob=await LocalAPI.exportAll(); await NativeBridge.saveFile('autodesk-evidencija.json', blob); } catch(e){toast(e.message);} };
     $('#importAll').onchange = async e => { const file=e.target.files[0]; if(!file || !confirm('Uvoz će zameniti postojeću evidenciju na svim uređajima. Nastaviti?'))return; try { await LocalAPI.restore(file); toast('Podaci su uvezeni.'); await navigate('settings'); }catch(err){toast(err.message);} };
     $('#pwForm').onsubmit = async e => {
         e.preventDefault();
