@@ -1,0 +1,90 @@
+name: Build Android APK
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: build-apk
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+      ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+      ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Instalacija paketa
+        run: npm install --no-audit --no-fund
+
+      - name: Priprema web fajlova (www)
+        run: node scripts/prepare-www.js
+
+      - name: Android projekat
+        run: npx cap add android
+
+      - name: Ključ za potpisivanje
+        run: |
+          if [ -n "$ANDROID_KEYSTORE_BASE64" ]; then
+            echo "$ANDROID_KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/autodesk.keystore"
+            echo "KEYSTORE_PATH=$RUNNER_TEMP/autodesk.keystore" >> "$GITHUB_ENV"
+            echo "KEYSTORE_PASSWORD=$ANDROID_KEYSTORE_PASSWORD" >> "$GITHUB_ENV"
+            echo "KEY_ALIAS=${ANDROID_KEY_ALIAS:-autodesk}" >> "$GITHUB_ENV"
+            echo "SIGNED=true" >> "$GITHUB_ENV"
+          else
+            echo "::warning::Nema ANDROID_KEYSTORE_BASE64 u Secrets. APK se potpisuje privremenim ključem pa se neće moći instalirati preko starije verzije."
+            echo "SIGNED=false" >> "$GITHUB_ENV"
+          fi
+
+      - name: Dopune Android projekta (plugin za štampu, verzija, potpisivanje)
+        run: bash scripts/patch-android.sh
+
+      - name: Ikonice
+        continue-on-error: true
+        run: npx capacitor-assets generate --android --iconBackgroundColor '#0F1B2D' --iconBackgroundColorDark '#0F1B2D'
+
+      - name: Sinhronizacija
+        run: npx cap sync android
+
+      - name: Građenje APK
+        working-directory: android
+        run: |
+          chmod +x gradlew
+          if [ "$SIGNED" = "true" ]; then
+            ./gradlew assembleRelease --no-daemon
+            cp app/build/outputs/apk/release/app-release.apk ../AutoDesk.apk
+          else
+            ./gradlew assembleDebug --no-daemon
+            cp app/build/outputs/apk/debug/app-debug.apk ../AutoDesk.apk
+          fi
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: AutoDesk-apk
+          path: AutoDesk.apk
+
+      - name: Objava (Releases, strana „apk-latest“)
+        run: |
+          gh release delete apk-latest --cleanup-tag -y || true
+          gh release create apk-latest AutoDesk.apk \
+            --title "AutoDesk APK (verzija ${{ github.run_number }})" \
+            --notes "Najnoviji APK. Preuzmite AutoDesk.apk na telefon i instalirajte ga." \
+            --prerelease
