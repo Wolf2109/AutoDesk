@@ -77,6 +77,16 @@ function bootFail(e) {
  * pa „nazad“ na telefonu zatvara prozor/meni ili vraća na prethodnu stranicu umesto da izađe iz aplikacije.
  */
 const ui = { menu: false, modal: false, ignorePop: 0, backDone: null, backResolve: null };
+const pageTrail = [];   // Android aplikacija: stranice kojima se „nazad“ vraća (ne oslanja se na istoriju WebView-a)
+
+/** Android dugme „nazad“: zatvori prozor ili meni, zatim vrati na prethodnu stranicu, a tek sa početne izađi. */
+function nativeBack() {
+    if (ui.modal) { closeModal(); return; }
+    if (ui.menu || $('#sidebar')?.classList.contains('open')) { setMenuOpen(false); return; }
+    if (pageTrail.length) { navigate(pageTrail.pop(), true, true); return; }
+    if (state.page && state.page !== 'dashboard') { navigate('dashboard', true, true); return; }
+    NativeBridge.exitApp();
+}
 
 function historyBack() {
     ui.ignorePop++;
@@ -217,7 +227,10 @@ let navSeq = 0;
 async function navigate(page, keep = false, fromPop = false) {
     const seq = ++navSeq;
     if (ui.backDone) await ui.backDone;            // sačekaj da se završi „nazad“ koji je zatvorio prozor
-    if (!fromPop && !keep) pushPage(page);
+    if (!fromPop && !keep) {
+        pushPage(page);
+        if (state.page && state.page !== page) { pageTrail.push(state.page); if (pageTrail.length > 30) pageTrail.shift(); }
+    }
     state.page = page;
     ui.menu = false;
     $('#sidebar')?.classList.remove('open');
@@ -1128,6 +1141,7 @@ async function init() {
     });
     history.replaceState({ page: 'dashboard' }, '');
     window.addEventListener('popstate', onPopState);
+    NativeBridge.onBackButton(nativeBack);
     await navigate('dashboard');
     hideBoot();
     

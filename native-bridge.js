@@ -44,7 +44,17 @@ const NativeBridge = (() => {
         await p.print({ html, title: title || 'AutoDesk' });
     }
 
-    return { isNative, saveFile, printHtml };
+    /** Android dugme „nazad“: kada postoji slušalac, aplikacija se ne zatvara sama već ga obrađuje naš kod. */
+    function onBackButton(fn) {
+        const app = isNative() ? plugin('App') : null;
+        if (app && app.addListener) app.addListener('backButton', fn);
+    }
+    function exitApp() {
+        const app = plugin('App');
+        if (app && app.exitApp) app.exitApp();
+    }
+
+    return { isNative, saveFile, printHtml, onBackButton, exitApp };
 })();
 
 window.NativeBridge = NativeBridge;
