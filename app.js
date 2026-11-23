@@ -393,9 +393,9 @@ function chart(data) {
     const scale = [0, .33, .66, 1].map(f => `<span class="cy" style="top:${((py + f * (H - 2 * py)) / H * 100).toFixed(2)}%">${short(max * (1 - f))}</span>`).join('');
 
     return `<div class="chartBox"><svg class="chart" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="Grafikon naplaćenog i potrošenog">` +
-        `<defs><linearGradient id="gArea" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#FFB81C" stop-opacity=".38"/><stop offset="1" stop-color="#FFB81C" stop-opacity="0"/></linearGradient></defs>` +
+        `<defs><linearGradient id="gArea" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffba08" stop-opacity=".38"/><stop offset="1" stop-color="#ffba08" stop-opacity="0"/></linearGradient></defs>` +
         grid + `<polygon points="${area}" fill="url(#gArea)" stroke="none"/>` +
-        `<polyline points="${line('charged')}" fill="none" stroke="#FFB81C"/>` +
+        `<polyline points="${line('charged')}" fill="none" stroke="#ffba08"/>` +
         `<polyline points="${line('spent')}" fill="none" stroke="#FF6B6B" stroke-dasharray="6 6"/>` +
         `</svg>${scale}${labels}</div><div class="legend"><span><i class="dot gold"></i>Naplaćeno</span><span><i class="dot red"></i>Potrošeno</span><em>${esc(fd(data[0].date))} — ${esc(fd(data[data.length - 1].date))} · iznosi u ${esc(state.currency)}</em></div>`;
 }
@@ -1130,7 +1130,7 @@ async function settingsPage() {
 }
 
 function loginScreen() {
-    document.body.innerHTML = `<div class="loginWrap"><div class="loginBox"><div class="brand"><img class="brandLogo" src="./slike/logo.png" alt=""><div><strong>Auto Dijagnostika Lazarević</strong><small>Evidencija</small></div></div><h2>Prijava</h2><p>Prijavite se svojim nalogom.</p><form id="loginForm"><div class="field"><label>Email</label><input id="email" type="email" required autocomplete="username"></div><div class="field"><label>Lozinka</label><input id="password" type="password" required autocomplete="current-password"></div><button class="primary">Prijavi se</button></form><p><button type="button" class="secondary" id="resetPw">Zaboravljena lozinka?</button></p><p id="loginError" style="color:var(--red)"></p></div></div>`;
+    document.body.innerHTML = `<div class="loginWrap"><div class="loginBox"><div class="brand"><img class="brandLogo" src="./slike/logo-mark.png" alt=""><div><strong translate="no">Auto dijagnostika <em>Lazarević</em></strong><small>Evidencija</small></div></div><h2>Prijava</h2><p>Prijavite se svojim nalogom.</p><form id="loginForm"><div class="field"><label>Email</label><input id="email" type="email" required autocomplete="username"></div><div class="field"><label>Lozinka</label><input id="password" type="password" required autocomplete="current-password"></div><button class="primary">Prijavi se</button></form><p><button type="button" class="secondary" id="resetPw">Zaboravljena lozinka?</button></p><p id="loginError" style="color:var(--red)"></p></div></div>`;
     if (!CloudSync.ready) $('#loginError').textContent = 'Firebase nije dostupan. Proverite internet vezu i osvežite stranicu.';
     $('#resetPw').onclick = async () => {
         try {
