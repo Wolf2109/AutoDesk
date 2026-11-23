@@ -77,16 +77,6 @@ function bootFail(e) {
  * pa „nazad“ na telefonu zatvara prozor/meni ili vraća na prethodnu stranicu umesto da izađe iz aplikacije.
  */
 const ui = { menu: false, modal: false, ignorePop: 0, backDone: null, backResolve: null };
-const pageTrail = [];   // Android aplikacija: stranice kojima se „nazad“ vraća (ne oslanja se na istoriju WebView-a)
-
-/** Android dugme „nazad“: zatvori prozor ili meni, zatim vrati na prethodnu stranicu, a tek sa početne izađi. */
-function nativeBack() {
-    if (ui.modal) { closeModal(); return; }
-    if (ui.menu || $('#sidebar')?.classList.contains('open')) { setMenuOpen(false); return; }
-    if (pageTrail.length) { navigate(pageTrail.pop(), true, true); return; }
-    if (state.page && state.page !== 'dashboard') { navigate('dashboard', true, true); return; }
-    NativeBridge.exitApp();
-}
 
 function historyBack() {
     ui.ignorePop++;
@@ -227,10 +217,7 @@ let navSeq = 0;
 async function navigate(page, keep = false, fromPop = false) {
     const seq = ++navSeq;
     if (ui.backDone) await ui.backDone;            // sačekaj da se završi „nazad“ koji je zatvorio prozor
-    if (!fromPop && !keep) {
-        pushPage(page);
-        if (state.page && state.page !== page) { pageTrail.push(state.page); if (pageTrail.length > 30) pageTrail.shift(); }
-    }
+    if (!fromPop && !keep) pushPage(page);
     state.page = page;
     ui.menu = false;
     $('#sidebar')?.classList.remove('open');
@@ -756,9 +743,10 @@ async function removeEntity(type, id) {
 function orderForm(item = {}) {
     modal(item.id ? 'Izmeni radni nalog' : 'Novi radni nalog', '');
     if (!item.client_id && state.clients.length === 1) item = { ...item, client_id: state.clients[0].id };
-    let clients = state.clients.map(x => ({ id: x.id, label: x.name }));
-    let vehicles = state.vehicles.filter(x => !item.client_id || x.client_id === item.client_id)
-        .map(x => ({ id: x.id, label: formatVehicle(x) }));
+    const NEW = '__new__';
+    let clients = [{ id: NEW, label: '➕ Novi klijent…' }, ...state.clients.map(x => ({ id: x.id, label: x.name }))];
+    let vehicles = [{ id: NEW, label: '➕ Novo vozilo…' }, ...state.vehicles.filter(x => !item.client_id || x.client_id === item.client_id)
+        .map(x => ({ id: x.id, label: formatVehicle(x) }))];
     let statuses = Object.entries(STATUS).map(([k, [l]]) => ({ id: k, label: l }));
 
     let fields = field('Datum', 'date', item.date || today(), 'date', true) +
@@ -766,6 +754,20 @@ function orderForm(item = {}) {
         selectField('Klijent', 'client_id', clients, item.client_id) +
         `<div class="field"><label for="vehFilter">Pronađi vozilo</label><input id="vehFilter" type="search" placeholder="Registracija ili marka…" autocomplete="off"></div>` +
         selectField('Vozilo', 'vehicle_id', vehicles, item.vehicle_id) +
+        `<div class="full moneyFields hidden" id="newClientBox"><h3>Novi klijent</h3><div class="formGrid">` +
+        field('Ime i prezime', 'nc_name', '', 'text', true) +
+        field('Telefon', 'nc_phone', '') +
+        field('Email', 'nc_email', '', 'email') +
+        `</div></div>` +
+        `<div class="full moneyFields hidden" id="newVehicleBox"><h3>Novo vozilo</h3><div class="formGrid">` +
+        field('Marka', 'nv_make', '', 'text', true) +
+        field('Model', 'nv_model', '', 'text', true) +
+        field('Registracija', 'nv_registration', '') +
+        field('Godište', 'nv_year', '', 'number') +
+        field('Motor', 'nv_engine', '') +
+        field('Gorivo', 'nv_fuel', '') +
+        field('VIN', 'nv_vin', '', 'text', false, 'full') +
+        `</div><p class="subtle">Kilometraža iz naloga se upisuje i na novo vozilo.</p></div>` +
         field('Kilometraža pri prijemu (km)', 'mileage', item.mileage, 'number') +
         field('Kodovi grešaka (odvojite zarezom)', 'dtc_codes', item.dtc_codes) +
         textArea('Prijavljeni problem', 'complaint', item.complaint) +
@@ -782,26 +784,70 @@ function orderForm(item = {}) {
         `</div><div class="difference" id="liveDiff">Razlika: ${fmt((item.charged_amount || 0) - (item.spent_amount || 0))}</div>` +
         `<p class="subtle">Naplaćeno unosite slobodno, nezavisno od cenovnika.</p></div>`;
 
-    formShell(fields, b => {
+    // Ako čuvanje naloga pukne posle kreiranja klijenta/vozila, pri ponovnom pokušaju se ne prave duplikati.
+    let createdClientId = null, createdVehicleId = null, createdVehicleClient = null;
+
+    formShell(fields, async b => {
         if (!b.description.trim()) throw Error('Opis posla je obavezan.');
         b.spent_amount = Math.round(Number(b.spent_amount || 0) * 100);
         b.charged_amount = Math.round(Number(b.charged_amount || 0) * 100);
+
+        const newClient = b.client_id === NEW;
+        if (newClient) {
+            if (!(b.nc_name || '').trim()) throw Error('Unesite ime novog klijenta.');
+            if (!createdClientId) {
+                const c = await send('/clients', 'POST', { name: b.nc_name, phone: b.nc_phone, email: b.nc_email });
+                createdClientId = c.id;
+            }
+            b.client_id = createdClientId;
+        }
+
+        if (newClient || b.vehicle_id === NEW) {
+            if (!(b.nv_make || '').trim() || !(b.nv_model || '').trim()) throw Error('Marka i model novog vozila su obavezni.');
+            if (!createdVehicleId || createdVehicleClient !== String(b.client_id)) {
+                const v = await send('/vehicles', 'POST', {
+                    client_id: b.client_id, make: b.nv_make, model: b.nv_model, year: b.nv_year, engine: b.nv_engine,
+                    fuel: b.nv_fuel, registration: b.nv_registration, vin: b.nv_vin, mileage: b.mileage
+                });
+                createdVehicleId = v.id;
+                createdVehicleClient = String(b.client_id);
+            }
+            b.vehicle_id = createdVehicleId;
+        }
+
+        for (const k of Object.keys(b)) if (k.startsWith('nc_') || k.startsWith('nv_')) delete b[k];
         return send('/orders' + (item.id ? '/' + item.id : ''), item.id ? 'PUT' : 'POST', b);
     });
+
+    // Prikaz/sakrivanje polja za novog klijenta i novo vozilo
+    const toggleNew = () => {
+        const newClient = $('#f_client_id').value === NEW;
+        if (newClient) $('#f_vehicle_id').value = NEW;
+        const newVehicle = newClient || $('#f_vehicle_id').value === NEW;
+        $('#f_vehicle_id').disabled = newClient;       // novi klijent => vozilo je nužno novo
+        $('#vehFilter').disabled = newClient;
+        $('#newClientBox').classList.toggle('hidden', !newClient);
+        $('#newVehicleBox').classList.toggle('hidden', !newVehicle);
+        document.querySelectorAll('#newClientBox input').forEach(i => i.disabled = !newClient);
+        document.querySelectorAll('#newVehicleBox input').forEach(i => i.disabled = !newVehicle);
+    };
 
     const fillVehicles = () => {
         const wanted = $('#f_vehicle_id').value, text = $('#vehFilter').value.trim().toLowerCase(), clientId = +$('#f_client_id').value;
         const options = state.vehicles.filter(v => (!clientId || v.client_id === clientId) && (!text || formatVehicle(v).toLowerCase().includes(text) || String(v.vin || '').toLowerCase().includes(text)));
         $('#f_vehicle_id').innerHTML = '<option value="">Izaberite vozilo</option>' +
+            `<option value="${NEW}" ${wanted === NEW ? 'selected' : ''}>➕ Novo vozilo…</option>` +
             options.map(v => `<option value="${v.id}" ${String(v.id) === wanted ? 'selected' : ''}>${esc(formatVehicle(v))}</option>`).join('');
     };
-    $('#f_client_id').onchange = fillVehicles;
+    $('#f_client_id').onchange = () => { fillVehicles(); toggleNew(); };
     $('#vehFilter').oninput = fillVehicles;
 
     $('#f_vehicle_id').onchange = e => {
+        toggleNew();
         const v = state.vehicles.find(x => x.id === +e.target.value);
         if (v && v.mileage != null && !$('#f_mileage').value) $('#f_mileage').value = v.mileage;
     };
+    toggleNew();
 
     let update = () => {
         $('#liveDiff').textContent = 'Razlika: ' + fmt(Math.round((Number($('#f_charged_amount').value || 0) - Number($('#f_spent_amount').value || 0)) * 100));
@@ -1141,7 +1187,6 @@ async function init() {
     });
     history.replaceState({ page: 'dashboard' }, '');
     window.addEventListener('popstate', onPopState);
-    NativeBridge.onBackButton(nativeBack);
     await navigate('dashboard');
     hideBoot();
     
