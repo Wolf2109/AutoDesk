@@ -223,12 +223,12 @@ async function loadBase() {
 const refresh = () => navigate(state.page, true);
 
 function syncStatus() {
-    const st = LocalAPI.status(), dot = $('#serverDot'), txt = $('#syncText'), banner = $('#banner');
+    const st = LocalAPI.status(), privatePending = PrivateCache.pendingCount(), dot = $('#serverDot'), txt = $('#syncText'), banner = $('#banner');
     if (dot) dot.style.color = st.offline ? '#E34B4B' : '#35C879';
-    if (txt) txt.textContent = st.offline ? 'Bez veze' : 'Sinhronizovano';
+    if (txt) txt.textContent = st.conflict ? 'Sukob izmena' : (st.pending || privatePending) ? 'Čeka sinhronizaciju' : st.offline ? 'Bez veze' : 'Sinhronizovano';
     if (banner) {
-        banner.style.display = st.offline ? 'block' : 'none';
-        banner.textContent = 'Nema veze sa oblakom — prikazani su poslednji sačuvani podaci. Izmene nisu moguće dok se veza ne vrati.';
+        banner.style.display = st.offline || st.pending || privatePending ? 'block' : 'none';
+        banner.textContent = st.conflict || ((st.pending || privatePending) ? 'Izmene su sačuvane na uređaju i čekaju sinhronizaciju.' : 'Bez veze sa oblakom — izmene evidencije se čuvaju lokalno.');
     }
 }
 
@@ -460,6 +460,8 @@ function reminderRow(x, todayIso) {
 }
 
 async function dashboard() {
+    await PrivateCache.ensureFirst('tools');
+    ToolsTracker.refreshBadge();
     let d = today(), month = d.slice(0, 7) + '-01';
     let [day, mon, rem, active] = await Promise.all([
         api('/stats?from=' + d + '&to=' + d),
@@ -484,11 +486,13 @@ async function dashboard() {
         statCard('Vozila', mon.vehicles, '', 'u evidenciji') +
         statCard('Klijenata', mon.clients, '', 'u evidenciji') +
         `</div>` +
+        ToolsTracker.dashboardCard() +
         (active.length ? `<section class="panel"><h3>Nalozi u toku (${active.length})</h3>${ordersTable(active.slice(0, 10))}</section>` : '') +
         (rem.rows.length ? `<section class="panel"><h3>Podsetnik za servis (${rem.rows.length})</h3><div class="remList">${rem.rows.map(x => reminderRow(x, rem.today)).join('')}</div></section>` : '') +
         `<section class="panel"><h3>Poslednji radni nalozi</h3>${ordersTable(mon.recent)}</section>`;
 
-    $('#refreshDash').onclick = refresh;
+    $('#dashTools').onclick = () => navigate('tools');
+    $('#refreshDash').onclick = async () => { try { await LocalAPI.refresh(); await PrivateCache.sync('tools'); } catch(e) { toast(e.message); } syncStatus(); await refresh(); };
     $('#dashboardNew').onclick = () => orderForm();
     wireOrderViews();
 }
@@ -794,7 +798,9 @@ function orderForm(item = {}) {
         field('VIN', 'nv_vin', '', 'text', false, 'full') +
         `</div><p class="subtle">Kilometraža iz naloga se upisuje i na novo vozilo.</p></div>` +
         field('Kilometraža pri prijemu (km)', 'mileage', item.mileage, 'number') +
-        field('Kodovi grešaka (odvojite zarezom)', 'dtc_codes', item.dtc_codes) +
+        field('Kodovi grešaka (odvojite zarezom)', 'dtc_codes', item.dtc_codes, 'text', false, 'full') +
+        `<div class="field full" id="dtcPanel"><label for="dtcSearch">Pretraga DTC baze (kod ili opis)</label><input id="dtcSearch" type="search" autocomplete="off" placeholder="P0420…"><p class="subtle" id="dtcInfo"></p><div id="dtcResults"></div><button type="button" class="secondary" id="dtcFill">Popuni opise iz baze</button></div>` +
+        textArea('DTC opisi / status (može se ručno izmeniti)', 'dtc_details', item.dtc_details || '') +
         textArea('Prijavljeni problem', 'complaint', item.complaint) +
         `<div class="field full"><label for="svcPick">Dodaj uslugu iz cenovnika (upisuje naziv u opis i dodaje cenu u „Naplaćeno“)</label><select id="svcPick"><option value="">— izaberite uslugu —</option>${state.services.slice().sort((a, b) => a.name.localeCompare(b.name, 'sr-Latn')).map(x => `<option value="${x.id}">${esc(x.name)} — ${esc(fmt(x.price_amount))}</option>`).join('')}</select></div>` +
         textArea('Opis izvršenog posla *', 'description', item.description) +
@@ -873,6 +879,42 @@ function orderForm(item = {}) {
         if (v && v.mileage != null && !$('#f_mileage').value) $('#f_mileage').value = v.mileage;
     };
     toggleNew();
+    const dtcForm = $('#editForm');
+    const dtcInput = $('#f_dtc_codes'), dtcDetails = dtcForm.querySelector('[name=dtc_details]');
+    const dtcSearch = $('#dtcSearch'), dtcInfo = $('#dtcInfo'), dtcResults = $('#dtcResults');
+    const dtcMake = () => $('#f_vehicle_id').value === NEW ? $('#f_nv_make').value : (state.vehicles.find(v => String(v.id) === $('#f_vehicle_id').value)?.make || '');
+    let dtcRequest = 0;
+    const showDtc = async () => {
+        const request = ++dtcRequest, make = dtcMake(), query = dtcSearch.value.trim();
+        dtcInfo.textContent = (make || 'Vozilo nije izabrano') + ' · lokalna baza';
+        dtcResults.replaceChildren();
+        try {
+            const db = await DTC.load();
+            if (!dtcForm.isConnected || request !== dtcRequest) return;
+            if (db.version.startsWith('starter')) dtcInfo.textContent += ' · početna baza (ograničena pokrivenost)';
+            const rows = query ? DTC.search(db, make, query) : DTC.codes(dtcInput.value).map(c => DTC.lookup(db, make, c) || {code:c,description:'Nema opisa za izabranu marku',scope:'Nepoznat'});
+            for (const r of rows) {
+                const b = document.createElement('button'); b.type = 'button'; b.className = 'secondary dtcResult';
+                b.textContent = r.code + ' · ' + r.scope + ' — ' + r.description;
+                b.onclick = () => { const existing = DTC.codes(dtcInput.value); if (!existing.includes(r.code)) dtcInput.value = [dtcInput.value.trim(),r.code].filter(Boolean).join(', '); dtcSearch.value = ''; showDtc(); };
+                dtcResults.append(b);
+            }
+            if (query.length >= 2 && !rows.length) dtcInfo.textContent += ' · nema rezultata';
+        } catch (e) { if (dtcForm.isConnected && request === dtcRequest) dtcInfo.textContent += ' · baza nije dostupna; ručni unos radi'; }
+    };
+    $('#dtcFill').onclick = async () => {
+        try { const db = await DTC.load(); if (!dtcForm.isConnected) return; const make = dtcMake();
+            const existing = dtcDetails.value.trim();
+            const newLines = DTC.codes(dtcInput.value).filter(c => !existing.split('\n').some(line => line.startsWith(c + ' '))).map(c => { const r = DTC.lookup(db,make,c); return c + ' — ' + (r ? r.description + ' [' + r.scope + ']' : 'opis nije dostupan'); });
+            dtcDetails.value = [existing,...newLines].filter(Boolean).join('\n');
+        } catch(e) { toast('DTC baza nije dostupna.'); }
+    };
+    dtcSearch.oninput = showDtc; dtcInput.oninput = showDtc;
+    $('#f_nv_make').addEventListener('input',showDtc);
+    $('#f_client_id').addEventListener('change',showDtc);
+    $('#f_vehicle_id').addEventListener('change',showDtc);
+    $('#vehFilter').addEventListener('input',showDtc);
+    showDtc();
 
     let update = () => {
         $('#liveDiff').textContent = 'Razlika: ' + fmt(Math.round((Number($('#f_charged_amount').value || 0) - Number($('#f_spent_amount').value || 0)) * 100));
@@ -907,6 +949,7 @@ async function viewOrder(id) {
             (o.mileage != null ? `<p class="subtle">Kilometraža pri prijemu: <b>${nf(o.mileage)} km</b></p>` : '') +
             (o.complaint ? `<h3>Prijavljeni problem</h3>${text(o.complaint)}` : '') +
             (codes.length ? `<h3>Kodovi grešaka</h3><p>${codes.map(c => `<span class="badge warn">${esc(c)}</span>`).join(' ')}</p>` : '') +
+            (o.dtc_details ? `<h3>DTC opisi / status</h3>${text(o.dtc_details)}` : '') +
             `<h3>Izvršeni posao</h3>${text(o.description)}` +
             `<p class="subtle">${esc(o.notes || 'Bez napomene')}</p>` +
             ((o.next_service_date || o.next_service_km != null) ? `<p class="notice">Sledeći servis: <b>${[o.next_service_date ? fd(o.next_service_date) : '', o.next_service_km != null ? nf(o.next_service_km) + ' km' : ''].filter(Boolean).join(' ili ')}</b></p>` : '') +
@@ -998,7 +1041,7 @@ async function viewOrder(id) {
         };
 
         $('#editOrder').onclick = () => orderForm(o);
-        $('#dupOrder').onclick = () => orderForm({ ...o, id: undefined, order_number: undefined, date: today(), status: 'done', mileage: null, complaint: '', dtc_codes: '', next_service_date: null, next_service_km: null });
+        $('#dupOrder').onclick = () => orderForm({ ...o, id: undefined, order_number: undefined, date: today(), status: 'done', mileage: null, complaint: '', dtc_codes: '', dtc_details: '', next_service_date: null, next_service_km: null });
         $('#doneOrder').onclick = closeModal;
     } catch (e) {
         toast(e.message);
@@ -1196,6 +1239,7 @@ async function init() {
     };
     
     $('#logout').onclick = async () => {
+        if (LocalAPI.status().pending || PrivateCache.pendingCount()) { toast('Prvo sinhronizujte lokalne izmene.'); return; }
         await CloudSync.logout();
         location.reload();
     };
@@ -1221,13 +1265,14 @@ async function init() {
     
     if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js').catch(() => {});
     
+    PrivateCache.flush().catch(e => toast(e.message));
     LocalAPI.autoBackup().catch(e => console.warn('Automatska kopija nije napravljena:', e.message));
 
     // Povremena provera oblaka (jedno čitanje) i prikaz stanja veze.
     setInterval(async () => { try { await api('/settings'); } catch (e) { /* stanje se prikazuje ispod */ } syncStatus(); }, 60000);
-    document.addEventListener('visibilitychange', () => {
-        if (document.visibilityState === 'visible') LocalAPI.refresh().then(syncStatus, syncStatus);
-    });
+    window.addEventListener('online', () => LocalAPI.refresh().then(syncStatus, syncStatus));
+    window.addEventListener('offline', syncStatus);
+    window.addEventListener('autodesk-private-sync', syncStatus);
 }
 
 init().catch(bootFail);

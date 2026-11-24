@@ -12,7 +12,7 @@ const PrivateCache = (() => {
     // Dve odvojene grupe: 'service' (vozila + servisi) i 'fuel' (gorivo), svaka sa svojom sinhronizacijom.
     const GROUPS = { service: ['vehicles', 'entries'], fuel: ['fuel'], tools: ['tools'] };
     const empty = () => ({ vehicles: [], entries: [], fuel: [], tools: [], syncedAt: { service: 0, fuel: 0, tools: 0 } });
-    let mem = null, rerender = null, barKind = 'fuel';
+    let mem = null, flushing = null, rerender = null, barKind = 'fuel';
 
     function load() {
         if (mem) return mem;
@@ -22,10 +22,7 @@ const PrivateCache = (() => {
         mem.syncedAt = { service: 0, fuel: 0, tools: 0, ...mem.syncedAt };
         return mem;
     }
-    function save() {
-        try { localStorage.setItem(KEY, JSON.stringify(mem)); }
-        catch (e) { console.warn('Lokalna kopija nije sačuvana:', e.message); }
-    }
+    function save() { localStorage.setItem(KEY, JSON.stringify(mem)); window.dispatchEvent(new Event('autodesk-private-sync')); }
 
     const strip = d => { const { created, ...rest } = d.data(); return { id: d.id, ...rest }; };
 
@@ -33,8 +30,11 @@ const PrivateCache = (() => {
     async function sync(kind) {
         if (!GROUPS[kind]) throw Error('Nepoznata grupa podataka.');
         if (!navigator.onLine) throw Error('Nema internet veze.');
+        await flush();
+        if (pendingCount()) throw Error('Lokalne izmene čekaju sinhronizaciju.');
         const root = CloudSync.privateRoot(), c = load();
-        const snaps = await Promise.all(GROUPS[kind].map(n => root.collection(n).get()));
+        const snaps = await Promise.all(GROUPS[kind].map(n => root.collection(n).get({source:'server'})));
+        if (pendingCount()) throw Error('Lokalne izmene su nastale tokom sinhronizacije. Ponovite.');
         GROUPS[kind].forEach((n, i) => { c[n] = snaps[i].docs.map(strip); });
         c.syncedAt[kind] = Date.now();
         save();
@@ -54,7 +54,39 @@ const PrivateCache = (() => {
     }
     function remove(kind, id) { load()[kind] = load()[kind].filter(x => x.id !== id); save(); }
     function removeWhere(kind, fn) { load()[kind] = load()[kind].filter(x => !fn(x)); save(); }
-    function needOnline() { if (!navigator.onLine) throw Error('Nema internet veze. Izmene su moguće samo kada ste online.'); }
+    function needOnline() { if (pendingCount()) throw Error('Prvo sinhronizujte lokalne izmene.'); if (!navigator.onLine) throw Error('Nema internet veze. Izmene su moguće samo kada ste online.'); }
+
+    const pendingCount = () => (load().queue || []).length;
+    async function flush() {
+        if (flushing) return flushing;
+        if (!navigator.onLine || !pendingCount()) return;
+        flushing = (async () => {
+            const c = load();
+            while (c.queue?.length) {
+                const op = c.queue[0], ref = CloudSync.privateRoot().collection(op.kind).doc(op.id);
+                await CloudSync.privateDb().runTransaction(async tx => {
+                    const doc = await tx.get(ref), current = doc.exists ? strip(doc) : null;
+                    const canonical = o => o == null ? 'null' : JSON.stringify(Object.keys(o).sort().map(k => [k,o[k]]));
+                    if (canonical(current) === canonical(op.after)) return;
+                    if (canonical(current) !== canonical(op.before)) throw Error('Sukob izmena u ' + op.kind + '. Lokalni zapis je zadržan.');
+                    if (op.after) { const {id,...data} = op.after; tx.set(ref,data,{merge:true}); } else tx.delete(ref);
+                });
+                c.queue.shift(); save();
+            }
+        })().finally(() => { flushing = null; });
+        return flushing;
+    }
+    function edit(kind,id,data) {
+        const c = load(), previous = JSON.stringify(c);
+        const before = c[kind].find(x => x.id === id) || null, after = data ? {...before,...data,id} : null;
+        c.queue ||= []; c.queue.push({kind,id,before,after});
+        c[kind] = c[kind].filter(x => x.id !== id); if (after) c[kind].push(after);
+        try { save(); } catch(e) { mem = JSON.parse(previous); throw e; }
+        flush().catch(e => { console.warn(e.message); if (typeof toast === 'function') toast(e.message); });
+        return id;
+    }
+    const create = (kind,data) => edit(kind, CloudSync.privateRoot().collection(kind).doc().id,data);
+    window.addEventListener('online', () => flush().catch(e => toast(e.message)));
 
     /* ---------- traka sa dugmetom „Sinhronizuj“ ---------- */
 
@@ -62,7 +94,7 @@ const PrivateCache = (() => {
 
     function bar(kind = barKind) {
         const t = load().syncedAt[kind], on = navigator.onLine;
-        return `<div class="syncBar"><div class="syncInfo"><i class="syncDot ${on ? 'on' : 'off'}"></i><span>${t ? 'Sinhronizovano: ' + when(t) : 'Još nije sinhronizovano'}${on ? '' : ' · bez interneta (samo pregled)'}</span></div>` +
+        return `<div class="syncBar"><div class="syncInfo"><i class="syncDot ${on ? 'on' : 'off'}"></i><span>${t ? 'Sinhronizovano: ' + when(t) : 'Još nije sinhronizovano'}${on ? '' : ' · bez interneta'}${pendingCount() ? ' · čeka: ' + pendingCount() : ''}</span></div>` +
             `<button class="secondary" id="syncBtn" ${on ? '' : 'disabled'}>⟳ Sinhronizuj</button></div>`;
     }
 
@@ -93,7 +125,7 @@ const PrivateCache = (() => {
     window.addEventListener('online', refreshBar);
     window.addEventListener('offline', refreshBar);
 
-    return { load, sync, ensureFirst, upsert, remove, removeWhere, needOnline, bar, bind };
+    return { load, sync, ensureFirst, upsert, remove, removeWhere, needOnline, bar, bind, edit, create, flush, pendingCount };
 })();
 
 window.PrivateCache = PrivateCache;

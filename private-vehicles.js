@@ -134,7 +134,7 @@ const PrivateVehicles = (() => {
         box.querySelectorAll('[data-pvedit]').forEach(b => b.onclick = () => entryForm(pv.entries.find(x => x.id === b.dataset.pvedit)));
         box.querySelectorAll('[data-pvdel]').forEach(b => b.onclick = async () => {
             if (!confirm('Obrisati ovaj unos?')) return;
-            try { PrivateCache.needOnline(); await ecol().doc(b.dataset.pvdel).delete(); PrivateCache.remove('entries', b.dataset.pvdel); await render(); toast('Unos je obrisan.'); } catch (e) { toast(e.message); }
+            try { PrivateCache.edit('entries', b.dataset.pvdel, null); await render(); toast('Unos je obrisan.'); } catch (e) { toast(e.message); }
         });
     }
 
@@ -149,12 +149,11 @@ const PrivateVehicles = (() => {
             field('VIN', 'vin', item.vin, 'text', false, 'full') +
             textArea('Beleške', 'notes', item.notes),
             async b => {
-                PrivateCache.needOnline();
                 const name = (b.name || '').trim();
                 if (!name) throw Error('Unesite naziv vozila.');
                 const data = { name, registration: (b.registration || '').trim(), year: (b.year || '').trim(), vin: (b.vin || '').trim(), notes: (b.notes || '').trim() };
-                if (item.id) { await vcol().doc(item.id).update(data); PrivateCache.upsert('vehicles', { id: item.id, ...data }); }
-                else { const ref = await vcol().add({ ...data, created: CloudSync.privateStamp() }); PrivateCache.upsert('vehicles', { id: ref.id, ...data }); pv.selected = ref.id; }
+                if (item.id) { PrivateCache.edit('vehicles', item.id, data); }
+                else { const ref = {id: PrivateCache.create('vehicles', data)}; pv.selected = ref.id; }
             }
         );
     }
@@ -174,7 +173,6 @@ const PrivateVehicles = (() => {
             curField +
             textArea('Opis / beleške', 'notes', item.notes),
             async b => {
-                PrivateCache.needOnline();
                 if (!b.vehicle_id) throw Error('Izaberite vozilo.');
                 if (!/^\d{4}-\d{2}-\d{2}$/.test(b.date || '')) throw Error('Unesite ispravan datum.');
                 const title = (b.title || '').trim();
@@ -187,8 +185,8 @@ const PrivateVehicles = (() => {
                     amount: b.amount === '' ? 0 : Math.round(Number(b.amount) * 100) / 100,
                     currency: CURRENCIES.includes(b.currency) ? b.currency : 'RSD'
                 };
-                if (item.id) { await ecol().doc(item.id).update(data); PrivateCache.upsert('entries', { id: item.id, ...data }); }
-                else { const ref = await ecol().add({ ...data, created: CloudSync.privateStamp() }); PrivateCache.upsert('entries', { id: ref.id, ...data }); }
+                if (item.id) { PrivateCache.edit('entries', item.id, data); }
+                else { const ref = {id: PrivateCache.create('entries', data)}; }
                 pv.selected = b.vehicle_id;
             }
         );

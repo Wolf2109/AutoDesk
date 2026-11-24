@@ -135,7 +135,7 @@ footer{border-top:1px solid #DDE2EA;margin-top:28px;padding-top:10px;color:#6670
       card('Vozilo', field('Vozilo', vehicle) + field('Registracija', o.vehicle_registration) + field('VIN', o.vehicle_vin) + field('Godište', o.vehicle_year) + field('Motor', engine) + field('Kilometraža', km != null ? thousands(km) + ' km' : '')) +
       `</div>` +
       section('Prijavljeni problem', paragraph(o.complaint)) +
-      section('Dijagnostika – kodovi grešaka', pills(o.dtc_codes)) +
+      section('Dijagnostika – kodovi grešaka', pills(o.dtc_codes) + paragraph(o.dtc_details)) +
       section('Izvršeni radovi', paragraph(o.description)) +
       section('Napomena', paragraph(o.notes)) +
       `<div class="total"><div><small>Ukupno naplaćeno</small></div><strong>${esc(money(o.charged_amount, ctx.cur))}</strong></div>` +

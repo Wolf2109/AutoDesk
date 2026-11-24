@@ -1,0 +1,40 @@
+{
+  "indexes": [],
+  "fieldOverrides": [
+    {
+      "collectionGroup": "clients",
+      "fieldPath": "payload",
+      "indexes": []
+    },
+    {
+      "collectionGroup": "vehicles",
+      "fieldPath": "payload",
+      "indexes": []
+    },
+    {
+      "collectionGroup": "services",
+      "fieldPath": "payload",
+      "indexes": []
+    },
+    {
+      "collectionGroup": "orders",
+      "fieldPath": "payload",
+      "indexes": []
+    },
+    {
+      "collectionGroup": "photo_metadata",
+      "fieldPath": "payload",
+      "indexes": []
+    },
+    {
+      "collectionGroup": "sync",
+      "fieldPath": "payload",
+      "indexes": []
+    },
+    {
+      "collectionGroup": "sync",
+      "fieldPath": "text",
+      "indexes": []
+    }
+  ]
+}

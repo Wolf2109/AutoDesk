@@ -153,7 +153,7 @@ const FuelTracker = (() => {
         box.querySelectorAll('[data-fedit]').forEach(b => b.onclick = () => entryForm(st.all.find(x => x.id === b.dataset.fedit)));
         box.querySelectorAll('[data-fdel]').forEach(b => b.onclick = async () => {
             if (!confirm('Obrisati ovaj unos?')) return;
-            try { PrivateCache.needOnline(); await col().doc(b.dataset.fdel).delete(); PrivateCache.remove('fuel', b.dataset.fdel); await render(); toast('Unos je obrisan.'); } catch (e) { toast(e.message); }
+            try { PrivateCache.edit('fuel', b.dataset.fdel, null); await render(); toast('Unos je obrisan.'); } catch (e) { toast(e.message); }
         });
     }
 
@@ -172,13 +172,12 @@ const FuelTracker = (() => {
             field('Iznos (RSD)', 'price', item.price ?? '', 'number', true) +
             field('Bodovi', 'points', item.points ?? '', 'number'),
             async b => {
-                PrivateCache.needOnline();
                 const liters = Number(b.liters), price = Number(b.price);
                 if (!/^\d{4}-\d{2}-\d{2}$/.test(b.date || '')) throw Error('Unesite ispravan datum.');
                 if (!(liters > 0) || !(price > 0)) throw Error('Litara i iznos moraju biti veći od nule.');
                 const data = { date: b.date, time: b.time || '', product: (b.product || '').trim().toUpperCase() || 'GORIVO', liters: Math.round(liters * 100) / 100, price: Math.round(price * 100) / 100, points: b.points === '' ? null : Math.round(Number(b.points)) };
-                if (item.id) { await col().doc(item.id).update(data); PrivateCache.upsert('fuel', { id: item.id, ...data }); }
-                else { const ref = await col().add({ ...data, created: CloudSync.privateStamp() }); PrivateCache.upsert('fuel', { id: ref.id, ...data }); }
+                if (item.id) { PrivateCache.edit('fuel', item.id, data); }
+                else { const ref = {id: PrivateCache.create('fuel', data)}; }
             }
         );
     }

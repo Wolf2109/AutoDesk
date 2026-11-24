@@ -8,9 +8,8 @@
  *   photos/{id}               -> { order_id, data }           (jedna smanjena fotografija = jedan dokument)
  *   backups/{name}            -> { kind, ts, count, size }    + backups/{name}/chunks/{i} -> { text }
  *
- * Svaka verzija evidencije dobija svoje delove (jedinstven prefiks), a meta se prebacuje transakcijom
- * samo ako je verzija ista kao ona koju je uređaj pročitao. Tako dva uređaja ne mogu da pomešaju
- * delove niti da tiho prepišu tuđu izmenu.
+ * Male izmene menjaju samo zahvaćene delove u jednoj transakciji sa meta dokumentom.
+ * Velike izmene koriste nov prefiks; čitanje proverava verziju pre i posle.
  */
 const CloudSync = (() => {
   const cfg = window.AUTODESK_FIREBASE_CONFIG || {};
@@ -18,7 +17,7 @@ const CloudSync = (() => {
   const ready = !!(sdk && cfg.apiKey && cfg.projectId && cfg.appId && cfg.ownerUid && !cfg.apiKey.includes('OVDE'));
   const CHUNK = 250000;      // znakova po dokumentu (Firestore ograničenje je 1 MiB)
   const PHOTO_MAX = 900000;  // najveća dozvoljena dužina jedne fotografije (data URL)
-  let auth, db;
+  let auth, db, cached = null;
   if (ready) {
     firebase.initializeApp(cfg);
     auth = firebase.auth();
@@ -50,60 +49,129 @@ const CloudSync = (() => {
 
   /* ---------- evidencija ---------- */
 
-  async function getMeta() {
-    const d = await syncCol().doc('meta').get();
+  const GROUPS = ['clients', 'vehicles', 'services', 'orders', 'photo_metadata'];
+  const keys = ['clients', 'vehicles', 'services', 'orders', 'photos'];
+  const colFor = (generation, group) => base().collection('record_sets').doc(generation).collection(group);
+  const rawMeta = async () => {
+    const d = await syncCol().doc('meta').get({source:'server'});
     return d.exists ? d.data() : null;
-  }
-
+  };
+  const conflict = () => Object.assign(Error('Podaci su izmenjeni na drugom uređaju.'), {code:'conflict'});
+  const restOf = state => Object.fromEntries(Object.entries(state).filter(([k]) => !keys.includes(k)));
+  const rowMap = (state, k) => {
+    const map = new Map();
+    for (const row of state[k] || []) {
+      const id = String(row.id);
+      if (!id || id === 'undefined' || id.includes('/') || map.has(id)) throw Error('Neispravan ili dupliran ID: '+k);
+      const payload = JSON.stringify(row);
+      if (new TextEncoder().encode(payload).length > 900000) throw Error('Zapis je prevelik: '+k);
+      map.set(id,payload);
+    }
+    return map;
+  };
   async function readChunks(meta) {
-    const count = meta.count;
-    if (!Number.isSafeInteger(count) || count < 1 || count > 2000) throw Error('Neispravna struktura podataka u oblaku.');
-    const prefix = meta.prefix || 'chunk_'; // stariji format nije imao prefiks
-    const docs = await Promise.all(Array.from({ length: count }, (_, i) => syncCol().doc(prefix + i).get()));
-    if (docs.some(d => !d.exists)) return null;
-    return JSON.parse(docs.map(d => d.data().text).join(''));
+    if (!Number.isSafeInteger(meta.count) || meta.count < 1 || meta.count > 2000) throw Error('Neispravna stara evidencija.');
+    const docs = await Promise.all(Array.from({length:meta.count}, (_,i) => syncCol().doc((meta.prefix || 'chunk_')+i).get({source:'server'})));
+    if (docs.some(d => !d.exists)) throw Error('Nedostaje deo stare evidencije.');
+    return JSON.parse(docs.map(d=>d.data().text).join(''));
   }
-
-  /** Učitava trenutnu evidenciju. Ako je neko u međuvremenu objavio novu verziju, pokušava ponovo. */
-  async function loadState() {
-    for (let attempt = 0; attempt < 4; attempt++) {
-      const meta = await getMeta();
-      if (!meta) return { meta: null, state: null };
-      const state = await readChunks(meta);
-      if (state) return { meta, state };
-      await sleep(400 * (attempt + 1));
+  // A fresh generation is invisible until its pointer commits. Never delete the legacy data.
+  async function publishGeneration(state, expected, legacy = null) {
+    const generation = db.collection('autodesk_users').doc().id, version = expected + 1;
+    const payload = JSON.stringify(restOf(state));
+    if (new TextEncoder().encode(payload).length > 900000) throw Error('Podešavanja su prevelika.');
+    const records = keys.flatMap((k,i) => [...rowMap(state,k)].map(([id,payload]) => ({ref:colFor(generation,GROUPS[i]).doc(id),payload})));
+    for (let i=0;i<records.length;i+=8) {
+      const batch=db.batch();
+      records.slice(i,i+8).forEach(r=>batch.set(r.ref,{payload:r.payload,revision:version,deleted:false}));
+      await batch.commit();
     }
-    throw Error('Podaci u oblaku se trenutno menjaju. Pokušajte ponovo za nekoliko sekundi.');
+    const meta = {schema:2,generation,version,payload,groupVersions:Object.fromEntries(GROUPS.map(g=>[g,version]))};
+    await db.runTransaction(async tx=>{
+      const ref=syncCol().doc('meta'), d=await tx.get(ref), m=d.exists?d.data():null;
+      if ((m?.version || 0)!==expected || (legacy && m?.schema===2)) throw conflict();
+      tx.set(ref,{...meta,updatedAt:stamp(), ...(legacy?{legacy:{version:legacy.version,prefix:legacy.prefix||'chunk_',count:legacy.count}}:m?.legacy?{legacy:m.legacy}:{})});
+    });
+    cached={meta,state:JSON.stringify(state)};
+    return meta;
   }
-
-  /** Čuva novu verziju; baca grešku sa code === 'conflict' ako je verzija u oblaku promenjena. */
-  async function saveState(state, baseVersion) {
-    const chunks = split(JSON.stringify(state));
-    if (chunks.length > 1500) throw Error('Previše podataka za sinhronizaciju.');
-    const version = baseVersion + 1, prefix = `s${version}_${token()}_`, col = syncCol(), metaRef = col.doc('meta');
-    let old = null;
-    try {
-      for (let i = 0; i < chunks.length; i += 400) {
-        const b = db.batch();
-        chunks.slice(i, i + 400).forEach((text, j) => b.set(col.doc(prefix + (i + j)), { text }));
-        await b.commit();
+  async function getMeta() {
+    for(let attempt=0;attempt<3;attempt++) {
+      const meta=await rawMeta();
+      if (!meta || meta.schema===2) return meta;
+      const state=await readChunks(meta);
+      try { return await publishGeneration(state,meta.version||0,meta); }
+      catch(e) { if(e.code!=='conflict') throw e; }
+    }
+    throw conflict();
+  }
+  async function loadState(firstMeta) {
+    for(let attempt=0;attempt<4;attempt++) {
+      const meta=attempt===0 && firstMeta ? firstMeta : await getMeta();
+      if(!meta) return {meta:null,state:null};
+      if(meta.schema!==2) throw Error('Nepodržan format baze.');
+      const previous=cached && cached.meta.schema===2 && cached.meta.generation===meta.generation && cached.meta.version<=meta.version ? cached : null;
+      if(previous?.meta.version===meta.version) return {meta,state:JSON.parse(previous.state)};
+      const state=JSON.parse(meta.payload);
+      const old=previous ? JSON.parse(previous.state) : {};
+      for(let i=0;i<keys.length;i++) {
+        const k=keys[i], col=colFor(meta.generation,GROUPS[i]);
+        const map=new Map((old[k]||[]).map(r=>[String(r.id),r]));
+        if(previous && meta.groupVersions?.[GROUPS[i]] <= previous.meta.version) { state[k]=[...map.values()]; continue; }
+        let q=previous ? col.where('revision','>',previous.meta.version) : col;
+        // Bounded network pages; first sync still builds the complete offline copy.
+        q=q.orderBy(previous?'revision':firebase.firestore.FieldPath.documentId()).limit(250);
+        while(true) {
+          const page=await q.get({source:'server'});
+          for(const d of page.docs) {
+            const r=d.data();
+            if(r.deleted) map.delete(d.id); else map.set(d.id,JSON.parse(r.payload));
+          }
+          if(page.docs.length<250) break;
+          q=q.startAfter(page.docs[page.docs.length-1]);
+        }
+        state[k]=[...map.values()].sort((a,b)=>Number(a.id)-Number(b.id));
       }
-      await db.runTransaction(async tx => {
-        const m = await tx.get(metaRef);
-        const current = m.exists ? (m.data().version || 0) : 0;
-        if (current !== baseVersion) { const e = Error('Podaci su izmenjeni na drugom uređaju.'); e.code = 'conflict'; throw e; }
-        old = m.exists ? m.data() : null;
-        tx.set(metaRef, { version, prefix, count: chunks.length, updatedAt: stamp() });
-      });
-    } catch (e) {
-      await batchDelete(chunks.map((_, i) => col.doc(prefix + i))).catch(() => {});
-      throw e;
+      const check=await rawMeta();
+      if(check?.version===meta.version && check.generation===meta.generation) {
+        cached={meta,state:JSON.stringify(state)}; return {meta,state};
+      }
+      await sleep(200*(attempt+1));
     }
-    if (old?.count) {
-      const oldPrefix = old.prefix || 'chunk_';
-      await batchDelete(Array.from({ length: old.count }, (_, i) => col.doc(oldPrefix + i))).catch(() => {});
+    throw Error('Podaci se trenutno menjaju. Ponovite sinhronizaciju.');
+  }
+  async function saveState(state, baseVersion) {
+    if(!cached || cached.meta.version!==baseVersion || cached.meta.schema!==2) {
+      const meta=await getMeta();
+      if((meta?.version||0)!==baseVersion) throw conflict();
+      if(!meta) return (await publishGeneration(state,baseVersion)).version;
+      await loadState(meta);
     }
-    return version;
+    const previous=JSON.parse(cached.state), meta=cached.meta, version=baseVersion+1, changes=[];
+    const payload=JSON.stringify(restOf(state));
+    if(new TextEncoder().encode(payload).length>900000) throw Error('Podešavanja su prevelika.');
+    keys.forEach((k,i)=>{
+      const before=rowMap(previous,k), after=rowMap(state,k), col=colFor(meta.generation,GROUPS[i]);
+      for(const [id,p] of after) if(before.get(id)!==p) changes.push({group:GROUPS[i],ref:col.doc(id),data:{payload:p,revision:version,deleted:false}});
+      for(const id of before.keys()) if(!after.has(id)) changes.push({group:GROUPS[i],ref:col.doc(id),data:{revision:version,deleted:true}});
+    });
+    if(!changes.length && payload===meta.payload) return baseVersion;
+    const bytes=changes.reduce((n,r)=>n+new TextEncoder().encode(r.data.payload||'').length+1024,0);
+    if(changes.length>400 || bytes>7000000) return (await publishGeneration(state,baseVersion)).version;
+    const groupVersions={...meta.groupVersions};
+    for(const r of changes) groupVersions[r.group]=version;
+    const next={...meta,version,payload,groupVersions};
+    await db.runTransaction(async tx=>{
+      const ref=syncCol().doc('meta'), d=await tx.get(ref);
+      if(!d.exists || d.data().version!==baseVersion || d.data().generation!==meta.generation) throw conflict();
+      changes.forEach(r=>tx.set(r.ref,r.data));
+      tx.set(ref,{...next,updatedAt:stamp()});
+    });
+    cached={meta:next,state:JSON.stringify(state)}; return version;
+  }
+  const cacheMeta = () => cached?.meta || null;
+  function primeCache(meta,state) {
+    if(meta?.schema===2 && state && (!cached || cached.meta.version<=meta.version)) cached={meta,state:JSON.stringify(state)};
   }
 
   /* ---------- fotografije ---------- */
@@ -126,9 +194,9 @@ const CloudSync = (() => {
 
   async function putBackup(name, text, kind = 'manual') {
     const ref = base().collection('backups').doc(name), chunks = split(text), col = ref.collection('chunks');
-    for (let i = 0; i < chunks.length; i += 400) {
+    for (let i = 0; i < chunks.length; i += 10) {
       const b = db.batch();
-      chunks.slice(i, i + 400).forEach((t, j) => b.set(col.doc(String(i + j)), { text: t }));
+      chunks.slice(i, i + 10).forEach((t, j) => b.set(col.doc(String(i + j)), { text: t }));
       await b.commit();
     }
     await ref.set({ kind, ts: Date.now(), count: chunks.length, size: text.length });
@@ -178,7 +246,7 @@ const CloudSync = (() => {
 
   return {
     privateRoot, privateDb: () => db, privateBatchDelete: batchDelete, privateStamp: stamp,
-    ready, getMeta, loadState, saveState, putPhoto, getPhoto, deletePhotos,
+    ready, getMeta, loadState, saveState, primeCache, cacheMeta, putPhoto, getPhoto, deletePhotos,
     putBackup, listBackups, getBackup, deleteBackup, login, resetPassword, changePassword,
     logout: () => auth?.signOut(),
     currentUser: () => auth?.currentUser,

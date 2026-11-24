@@ -4,13 +4,13 @@
  *  - Evidencija (klijenti, vozila, nalozi, cenovnik, podešavanja) je jedan JSON bez fotografija.
  *  - Fotografije su zasebni dokumenti, smanjeni u pregledaču pre slanja.
  *  - Izmena uvek prvo proverava verziju u oblaku (jedno čitanje) i čuva se samo ako se verzija poklapa.
- *  - IndexedDB čuva poslednju kopiju za pregled kada nema interneta (izmene tada nisu dozvoljene).
+ *  - IndexedDB čuva lokalne izmene i osnovu za spajanje sa oblakom nakon povratka veze.
  */
 const LocalAPI = (() => {
   const DBNAME = 'autodesk-pages-v1';
   const STATUSES = ['received', 'in_progress', 'waiting', 'done', 'delivered'];
   const ACTIVE = ['received', 'in_progress', 'waiting'];
-  const RECHECK_MS = 60000;
+  const RECHECK_MS = 300000;
   const EUR_RATE = 120;
   const BACKUP_DAYS = [1, 7, 15, 30];
 
@@ -136,59 +136,86 @@ const LocalAPI = (() => {
   let snapshot = null, version = 0, lastCheck = 0, lastSync = 0, offline = false;
   let initial = null, background = null, mutex = Promise.resolve();
 
+  let pendingBase = null, conflict = '', hydrated = false;
+  const same = (a,b) => JSON.stringify(a) === JSON.stringify(b);
+  async function persist(s, base = pendingBase, v = version) {
+    const cloud = CloudSync.cacheMeta?.();
+    await localWrite({...s, __sync: {base, version: v, cloud: cloud?.version === v ? cloud : null}});
+  }
+  async function hydrate() {
+    if (hydrated) return;
+    const raw = await localRead(), meta = raw.__sync;
+    delete raw.__sync;
+    if (meta || raw.clients.length || raw.orders.length || raw.vehicles.length || raw.services.length) {
+      snapshot = normalize(raw); version = meta?.version ?? -1; pendingBase = meta?.base || null;
+      if (meta?.cloud?.version === version) CloudSync.primeCache(meta.cloud, pendingBase || snapshot);
+    }
+    hydrated = true;
+  }
+  function merge(base, local, remote) {
+    const result = clone(remote);
+    if ((local.settings.currency !== base.settings.currency && !same(remote,base)) || (remote.settings.currency !== base.settings.currency && !same(local,base))) throw Error('Sukob promene valute. Lokalni podaci su zadržani.');
+    const choose = (b,l,r,label) => {
+      if (same(l,b)) return r;
+      if (same(r,b) || same(l,r)) return l;
+      throw Error('Sukob izmena: ' + label + '. Lokalna izmena je zadržana.');
+    };
+    for (const k of ['clients','vehicles','services','orders','photos']) {
+      const maps = [base,local,remote].map(s => new Map(s[k].map(x => [x.id,x])));
+      result[k] = [...new Set(maps.flatMap(m => [...m.keys()]))].map(id => choose(...maps.map(m => m.get(id)), k + ' #' + id)).filter(Boolean);
+    }
+    result.settings = choose(base.settings,local.settings,remote.settings,'podešavanja');
+    result.seq = Math.max(local.seq,remote.seq);
+    result.ids = {...remote.ids};
+    for (const k of Object.keys(local.ids)) result.ids[k] = Math.max(local.ids[k] || 0,remote.ids[k] || 0);
+    if (result.vehicles.some(v => !result.clients.some(c => c.id === v.client_id)) || result.orders.some(o => !result.vehicles.some(v => v.id === o.vehicle_id && v.client_id === o.client_id) || !result.clients.some(c => c.id === o.client_id)) || result.photos.some(p => !result.orders.some(o => o.id === p.work_order_id))) throw Error('Sukob povezanih zapisa. Lokalna izmena je zadržana.');
+    if (new Set(result.orders.map(o => o.order_number)).size !== result.orders.length) throw Error('Sukob brojeva naloga. Lokalna izmena je zadržana.');
+    return result;
+  }
   async function pull() {
+    await hydrate();
+    if (!navigator.onLine) throw Error('Nema interneta.');
     const meta = await CloudSync.getMeta();
-    if (!meta) {
-      const local = normalize(await localRead());
+    if (pendingBase) {
+      const remote = meta ? (await CloudSync.loadState(meta)) : {meta:null,state:emptyState()};
+      let merged;
+      try { merged = merge(pendingBase,snapshot,normalize(remote.state)); }
+      catch(e) { conflict = e.message; throw e; }
+      const v = await CloudSync.saveState(merged,remote.meta?.version || 0);
+      await persist(merged,null,v); snapshot = merged; version = v; pendingBase = null; conflict = '';
+    } else if (!meta) {
+      const local = snapshot || emptyState();
       if (local.clients.length || local.orders.length || local.vehicles.length || local.services.length) {
-        await migrate(local);
-        version = await CloudSync.saveState(local, 0);
-        snapshot = local;
+        await migrate(local); version = await CloudSync.saveState(local,0); snapshot = local;
       } else { snapshot = emptyState(); version = 0; }
-    } else if (!snapshot || (meta.version || 0) !== version) {
-      const { meta: m, state } = await CloudSync.loadState();
-      const s = normalize(state);
+      await persist(snapshot,null,version);
+    } else if (!snapshot || meta.version !== version) {
+      const {meta:m,state} = await CloudSync.loadState(meta), s = normalize(state);
       version = m.version || 0;
-      if (await migrate(s)) {
-        try { version = await CloudSync.saveState(s, version); }
-        catch (e) { if (e.code !== 'conflict') throw e; snapshot = null; return pull(); }
-      }
-      snapshot = s;
-      await localWrite(s).catch(() => {});
+      if (await migrate(s)) version = await CloudSync.saveState(s,version);
+      await persist(s,null,version); snapshot = s;
     }
-    lastCheck = lastSync = Date.now();
-    offline = false;
+    if (meta && meta.version === version && !pendingBase) CloudSync.primeCache(meta,snapshot);
+    lastCheck = lastSync = Date.now(); offline = false;
   }
-
   async function ensure(fresh) {
-    if (!window.CloudSync?.ready) err('Firebase nije dostupan. Proverite internet vezu.');
-    try {
-      if (!snapshot) { initial ??= pull().finally(() => { initial = null; }); await initial; }
-      else if (fresh) await pull();
-      else if (Date.now() - lastCheck > RECHECK_MS && !background) {
-        background = pull().catch(e => { offline = true; console.warn('Pozadinska sinhronizacija:', e); }).finally(() => { background = null; });
-      }
-    } catch (e) {
-      if (fresh) { offline = true; err('Nema veze sa oblakom. Izmena nije sačuvana.'); }
-      if (snapshot) { offline = true; return; }
-      const local = normalize(await localRead());
-      if (!(local.clients.length || local.orders.length || local.vehicles.length)) throw e;
-      snapshot = local; version = -1; offline = true;
+    if (!window.CloudSync?.ready) err('Firebase nije dostupan.');
+    await hydrate();
+    if (!navigator.onLine) { offline = true; if (!snapshot) err('Prvo učitavanje zahteva internet.'); return; }
+    if (!snapshot || !lastCheck || Date.now()-lastCheck > RECHECK_MS || (fresh && pendingBase)) {
+      try { initial ??= pull().finally(() => { initial = null; }); await initial; }
+      catch(e) { offline = true; lastCheck = Date.now(); if (!snapshot) throw e; }
     }
   }
-
   async function read(fresh = false) { await ensure(fresh); return clone(snapshot); }
-
   async function write(s) {
-    try { version = await CloudSync.saveState(s, version); }
-    catch (e) {
-      if (e.code === 'conflict') { await pull().catch(() => {}); err('Podaci su u međuvremenu izmenjeni na drugom uređaju. Osveženo je — ponovite izmenu.'); }
-      throw e;
-    }
-    snapshot = clone(s);
-    lastCheck = lastSync = Date.now();
-    offline = false;
-    await localWrite(s).catch(() => {});
+    const base = pendingBase || clone(snapshot);
+    await persist(s,base,version); snapshot = clone(s); pendingBase = base;
+    if (offline || !navigator.onLine) { offline = true; return; }
+    try {
+      const v = await CloudSync.saveState(s,version);
+      await persist(s,null,v); version = v; pendingBase = null; conflict = ''; lastCheck = lastSync = Date.now();
+    } catch(e) { offline = true; if(e.code === 'conflict') { try { await pull(); } catch(e) { console.warn(e.message); } } }
   }
 
   const lock = fn => { const run = mutex.then(fn, fn); mutex = run.catch(() => {}); return run; };
@@ -234,7 +261,7 @@ const LocalAPI = (() => {
     if (!STATUSES.includes(status)) err('Neispravan status naloga.');
     return {
       date: dateOrNull(b.date) || err('Datum je obavezan.'), client_id, vehicle_id, status,
-      complaint: text(b.complaint, 3000), description, dtc_codes: text(b.dtc_codes, 500), notes: text(b.notes, 5000),
+      complaint: text(b.complaint, 3000), description, dtc_codes: text(b.dtc_codes, 500), dtc_details: text(b.dtc_details, 12000), notes: text(b.notes, 5000),
       mileage: intOrNull(b.mileage, 'kilometraža'), next_service_date: dateOrNull(b.next_service_date), next_service_km: intOrNull(b.next_service_km, 'sledeći servis (km)'),
       spent_amount: money(b.spent_amount), charged_amount: money(b.charged_amount)
     };
@@ -267,7 +294,7 @@ const LocalAPI = (() => {
   function buildCsv(rows, currency, statusLabels) {
     const cols = [
       ['order_number', 'Nalog'], ['date', 'Datum'], ['status', 'Status'], ['client_name', 'Klijent'], ['vehicle_name', 'Vozilo'], ['mileage', 'Kilometraža'],
-      ['complaint', 'Prijavljeni problem'], ['dtc_codes', 'Kodovi grešaka'], ['description', 'Opis posla'], ['notes', 'Napomena'],
+      ['complaint', 'Prijavljeni problem'], ['dtc_codes', 'Kodovi grešaka'], ['dtc_details', 'DTC opisi / status'], ['description', 'Opis posla'], ['notes', 'Napomena'],
       ['spent_amount', 'Potrošeno'], ['charged_amount', 'Naplaćeno'], ['difference', 'Razlika']
     ];
     const cell = (o, k) => {
@@ -293,6 +320,7 @@ const LocalAPI = (() => {
   }
   async function makeBackup(kind = 'manual') {
     const s = await read(true), name = backupName(kind);
+    if (offline || pendingBase) err('Prvo sinhronizujte evidenciju.');
     await CloudSync.putBackup(name, await snapshotJson(s), kind);
     await pruneBackups().catch(() => {});
     return name;
@@ -300,7 +328,11 @@ const LocalAPI = (() => {
   /** Pravi automatsku kopiju ako je od poslednje prošlo izabrani broj dana (1, 7, 15 ili 30). */
   async function autoBackup() {
     const st = await read(), days = BACKUP_DAYS.includes(Number(st.settings.backup_days)) ? Number(st.settings.backup_days) : 30;
+    if (offline || pendingBase) return null;
+    const cached = Number(localStorage.getItem('autodesk_auto_backup_checked') || 0);
+    if (Date.now() - cached < 86400000) return null;
     const last = (await CloudSync.listBackups()).find(b => b.kind === 'auto');
+    localStorage.setItem('autodesk_auto_backup_checked', String(Date.now()));
     // Tolerancija od 6 sati: otvaranje aplikacije malo ranije u danu ne odlaže kopiju za ceo dan.
     if (last && Date.now() - last.ts < days * 86400000 - 6 * 3600000) return null;
     return makeBackup('auto');
@@ -310,6 +342,7 @@ const LocalAPI = (() => {
     if (!['clients', 'vehicles', 'services', 'orders'].every(k => Array.isArray(parsed[k]))) err('Neispravna kopija.');
     {
       const current = await read(true);
+      if (offline || pendingBase) err('Prvo sinhronizujte evidenciju.');
       await CloudSync.putBackup(backupName('pre-restore'), await snapshotJson(current), 'pre-restore');
       const next = normalize(parsed);
       delete next.backups;
@@ -332,7 +365,6 @@ const LocalAPI = (() => {
   /* ---------- glavni ulaz ---------- */
   async function call(url, opt = {}) {
     const method = (opt.method || 'GET').toUpperCase();
-    if (method === 'GET') return exec(url, opt, method);
     return lock(() => exec(url, opt, method));
   }
 
@@ -340,9 +372,11 @@ const LocalAPI = (() => {
     const u = new URL(url, 'https://local.invalid'), parts = u.pathname.split('/').filter(Boolean), table = parts[0], key = Number(parts[1]), q = u.searchParams;
     if (table === 'health') return { ok: true, offline, lastSync };
     const s = await read(method !== 'GET');
+    if (method !== 'GET' && conflict) err(conflict + ' Pre novih izmena izvezite lokalnu kopiju.');
     const body = opt.body instanceof FormData ? opt.body : opt.body ? JSON.parse(opt.body) : {};
     const save = async result => { await write(s); return result; };
-    const next = t => (s.ids[t] = (s.ids[t] || Math.max(0, ...(s[t] || []).map(x => x.id))) + 1);
+    const next = t => { let id; do { const a = crypto.getRandomValues(new Uint32Array(2)); id = (a[0] & 0xffff) * 4294967296 + a[1]; } while (!id || s[t].some(x => x.id === id)); return id; };
+    if (method !== 'GET' && (offline || pendingBase) && (table === 'photos' || table === 'backups' || parts[2] === 'photos' || (table === 'orders' && method === 'DELETE' && s.photos.some(p => p.work_order_id === key)))) err('Za ovu operaciju je potrebna veza i sinhronizovana evidencija.');
 
     if (table === 'settings') {
       if (method === 'GET') return clone(s.settings);
@@ -418,7 +452,7 @@ const LocalAPI = (() => {
           }
           return await save({ ok: true, added: added.length });
         } catch (e) {
-          if (added.length) await CloudSync.deletePhotos(added).catch(() => {});
+          if (added.length && !pendingBase) await CloudSync.deletePhotos(added).catch(() => {});
           throw e;
         }
       }
@@ -434,7 +468,7 @@ const LocalAPI = (() => {
           return (!st || (st === 'active' ? ACTIVE.includes(status) : status === st)) && inRange(o, q) &&
             (!q.get('client_id') || o.client_id === num(q.get('client_id'))) && (!q.get('vehicle_id') || o.vehicle_id === num(q.get('vehicle_id')));
         }).map(o => rich(s, o));
-        if (search) rows = rows.filter(o => [o.order_number, o.description, o.complaint, o.dtc_codes, o.client_name, o.vehicle_name].some(x => String(x || '').toLowerCase().includes(search)));
+        if (search) rows = rows.filter(o => [o.order_number, o.description, o.complaint, o.dtc_codes, o.dtc_details, o.client_name, o.vehicle_name].some(x => String(x || '').toLowerCase().includes(search)));
         return sortOrders(rows);
       }
       if (method === 'DELETE') {
@@ -444,13 +478,13 @@ const LocalAPI = (() => {
         s.orders.splice(i, 1);
         s.photos = s.photos.filter(p => p.work_order_id !== key);
         const result = await save({ ok: true });
-        if (gone.length) await CloudSync.deletePhotos(gone).catch(() => {});
+        if (gone.length && !pendingBase) await CloudSync.deletePhotos(gone).catch(() => {});
         return result;
       }
       const values = cleanOrder(body, s);
       bumpMileage(s, values.vehicle_id, values.mileage);
       if (method === 'POST') {
-        const o = { ...values, id: next('orders'), order_number: 'RN-' + String(++s.seq).padStart(6, '0'), created_at: stamp(), updated_at: stamp() };
+        const o = { ...values, id: next('orders'), order_number: 'RN-' + String(++s.seq).padStart(6, '0') + (offline ? '-' + next('orders').toString(36).toUpperCase() : ''), created_at: stamp(), updated_at: stamp() };
         s.orders.push(o);
         return save(rich(s, o));
       }
@@ -469,7 +503,7 @@ const LocalAPI = (() => {
       if (method === 'DELETE') {
         s.photos.splice(i, 1);
         const result = await save({ ok: true });
-        await CloudSync.deletePhotos([key]).catch(() => {});
+        if (!pendingBase) await CloudSync.deletePhotos([key]).catch(() => {});
         photoCache.delete(key);
         return result;
       }
@@ -536,6 +570,7 @@ const LocalAPI = (() => {
   /* ---------- izvoz / uvoz cele evidencije (sa fotografijama) ---------- */
   async function exportAll() {
     const s = await read(true), out = clone(s);
+    if (offline || pendingBase) return new Blob([JSON.stringify(out)], {type:'application/json'});
     out.photos = [];
     for (const p of s.photos) {
       try { out.photos.push({ ...p, data: await photoData(p.id) }); }
@@ -552,7 +587,7 @@ const LocalAPI = (() => {
   return {
     call, restore, exportAll, photoData,
     autoBackup: () => lock(autoBackup),
-    status: () => ({ offline, lastSync }),
+    status: () => ({ offline, lastSync, pending: !!pendingBase, conflict }),
     refresh: () => lock(() => pull().catch(e => { offline = true; throw e; }))
   };
 })();

@@ -80,7 +80,7 @@ const ToolsTracker = (() => {
         document.querySelectorAll('[data-tedit]').forEach(b => b.onclick = () => form(st.all.find(x => x.id === b.dataset.tedit)));
         document.querySelectorAll('[data-tdel]').forEach(b => b.onclick = async () => {
             if (!confirm('Obrisati ovaj uređaj?')) return;
-            try { PrivateCache.needOnline(); await col().doc(b.dataset.tdel).delete(); PrivateCache.remove('tools', b.dataset.tdel); await render(); toast('Uređaj je obrisan.'); }
+            try { PrivateCache.edit('tools', b.dataset.tdel, null); await render(); toast('Uređaj je obrisan.'); }
             catch (e) { toast(e.message); }
         });
         document.querySelectorAll('[data-trenew]').forEach(b => b.onclick = () => form({ ...st.all.find(x => x.id === b.dataset.trenew), _renew: true }));
@@ -113,15 +113,14 @@ const ToolsTracker = (() => {
             field('Cena obnove (RSD)', 'price', item.price ?? '', 'number') +
             textArea('Beleške', 'notes', item.notes || ''),
             async b => {
-                PrivateCache.needOnline();
                 if (!(b.name || '').trim()) throw Error('Unesite naziv uređaja.');
                 if (b.activated && b.expires && b.expires < b.activated) throw Error('Datum isteka je pre datuma aktivacije.');
                 const data = {
                     name: b.name.trim(), model: (b.model || '').trim(), serial: (b.serial || '').trim(), license: (b.license || '').trim(),
                     activated: b.activated || '', expires: b.expires || '', price: b.price === '' ? null : Math.round(Number(b.price) * 100) / 100, notes: (b.notes || '').trim()
                 };
-                if (item.id) { await col().doc(item.id).update(data); PrivateCache.upsert('tools', { id: item.id, ...data }); }
-                else { const ref = await col().add({ ...data, created: CloudSync.privateStamp() }); PrivateCache.upsert('tools', { id: ref.id, ...data }); }
+                if (item.id) { PrivateCache.edit('tools', item.id, data); }
+                else { const ref = {id: PrivateCache.create('tools', data)}; }
             }
         );
         if (renew) setTimeout(() => $('#f_expires')?.focus(), 50);
@@ -142,7 +141,11 @@ const ToolsTracker = (() => {
         if (n) b.insertAdjacentHTML('beforeend', `<i class="navBadge" title="Licence koje ističu ili su istekle">${n}</i>`);
     }
 
-    return { render, alertCount, refreshBadge };
+    function dashboardCard() {
+        const c = PrivateCache.load(), rows = c.tools.filter(e => ['expired','soon'].includes(status(e).key)).sort((a,b) => order(a)-order(b));
+        return `<section class="panel"><div class="toolbar"><h3>Licence koje ističu (${rows.length})</h3><button class="secondary" id="dashTools">Otvori alate</button></div>${rows.length ? rows.map(e => `<div class="tlCard ${status(e).key}"><div class="tlHead"><strong>${esc(e.name)}${e.model ? ' · ' + esc(e.model) : ''}</strong><span class="badge ${status(e).cls}">${status(e).label}</span></div><div class="subtle">${esc(fdate(e.expires))} · ${esc(status(e).note)}</div></div>`).join('') : `<p class="subtle">${c.syncedAt.tools ? 'Nema licenci koje ističu u narednih 30 dana ili su istekle.' : 'Licence još nisu sinhronizovane.'}</p>`}</section>`;
+    }
+    return { render, alertCount, refreshBadge, dashboardCard };
 })();
 
 window.ToolsTracker = ToolsTracker;

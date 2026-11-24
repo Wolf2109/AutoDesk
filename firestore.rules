@@ -1,13 +1,29 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Radionica: radni nalozi, klijenti, vozila, fotografije, rezervne kopije
-    match /autodesk_users/{uid}/{document=**} {
-      allow read, write: if request.auth != null && request.auth.uid == 'wPmjv92Ywbgs356jFCgLdCifFXx1' && uid == request.auth.uid;
+    function owner(uid) {
+      return request.auth != null && request.auth.uid == 'wPmjv92Ywbgs356jFCgLdCifFXx1' && uid == request.auth.uid;
     }
-    // Lična vozila: zasebna celina, odvojena od radionice
+    match /autodesk_users/{uid}/sync/meta {
+      allow read: if owner(uid);
+      allow create: if owner(uid);
+      allow update: if owner(uid) && (resource.data.get('schema', 1) != 2 || request.resource.data.get('schema', 1) == 2);
+    }
+    match /autodesk_users/{uid}/sync/{chunk} {
+      allow read: if owner(uid);
+      allow write: if owner(uid) && chunk != 'meta' && (!exists(/databases/$(database)/documents/autodesk_users/$(uid)/sync/meta) || get(/databases/$(database)/documents/autodesk_users/$(uid)/sync/meta).data.get('schema', 1) != 2);
+    }
+    match /autodesk_users/{uid}/record_sets/{generation}/{document=**} {
+      allow read, write: if owner(uid);
+    }
+    match /autodesk_users/{uid}/photos/{document=**} {
+      allow read, write: if owner(uid);
+    }
+    match /autodesk_users/{uid}/backups/{document=**} {
+      allow read, write: if owner(uid);
+    }
     match /autodesk_private/{uid}/{document=**} {
-      allow read, write: if request.auth != null && request.auth.uid == 'wPmjv92Ywbgs356jFCgLdCifFXx1' && uid == request.auth.uid;
+      allow read, write: if owner(uid);
     }
   }
 }

@@ -1,0 +1,14 @@
+const assert=require('node:assert/strict');
+const DTC=require('../dtc.js');
+const actual=require('../dtc-database.json');
+const sample={generic:{P0420:'generic'},manufacturers:{FORD:{P1131:'ford'},VOLKSWAGEN:{P1131:'vw'},MERCEDES:{P1131:'mb'}}};
+assert.equal(DTC.lookup(sample,'Ford','p1131').description,'ford');
+assert.equal(DTC.lookup(sample,'VW','P1131').description,'vw');
+assert.equal(DTC.lookup(sample,'Mercedes-Benz','P1131').description,'mb');
+assert.equal(DTC.lookup(sample,'Renault','P1131'),null);
+assert.equal(DTC.lookup(sample,'Renault','P0420').scope,'Generic');
+assert.deepEqual(DTC.codes('p0420, P0420; p1131\nU0100'),['P0420','P1131','U0100']);
+assert.equal(DTC.search(sample,'Ford','P11')[0].description,'ford');
+assert.ok(DTC.lookup(actual,'Ford','P0420'));
+assert.ok(Object.keys(actual.manufacturers).length>=2);
+console.log('DTC smoke OK');

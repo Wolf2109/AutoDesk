@@ -10,7 +10,7 @@ const path = require('path');
 const root = path.resolve(__dirname, '..');
 const out = path.join(root, 'www');
 const SKIP = new Set(['sw.js', 'package.json', 'package-lock.json', 'capacitor.config.json', 'firestore.rules']);
-const EXT = new Set(['.html', '.js', '.css', '.json', '.ico', '.png', '.jpg', '.svg']);
+const EXT = new Set(['.html', '.js', '.css', '.json', '.ico', '.png', '.jpg', '.svg', '.txt']);
 const UA = 'Mozilla/5.0 (Linux; Android 13; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Mobile Safari/537.36';
 
 fs.rmSync(out, { recursive: true, force: true });
