@@ -132,6 +132,7 @@ const navItems = [
     ['stats', '<svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>', 'Statistika'],
     ['private', '<svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 13l2-5.5A2 2 0 016.9 6h10.2A2 2 0 0119 7.5L21 13"/><path d="M3 13h18v5a1 1 0 01-1 1h-2v-2H6v2H4a1 1 0 01-1-1z"/><circle cx="7.5" cy="15.5" r=".6"/><circle cx="16.5" cy="15.5" r=".6"/></svg>', 'Lična vozila'],
     ['fuel', '<svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 21V5a2 2 0 012-2h6a2 2 0 012 2v16"/><path d="M4 21h12M7 8h6M15 10h2a2 2 0 012 2v4a1.5 1.5 0 003 0V9l-3-3"/></svg>', 'Gorivo'],
+    ['tools', '<svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a4 4 0 00-5.4 5.1L3.5 17.2a1.8 1.8 0 002.6 2.6l5.8-5.8a4 4 0 005.1-5.4l-2.4 2.4-2.1-.5-.5-2.1z"/></svg>', 'Alati'],
     ['settings', '<svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9L7 7M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1"/></svg>', 'Podešavanja']
 ];
 
@@ -225,10 +226,11 @@ async function navigate(page, keep = false, fromPop = false) {
     $('#menuBtn')?.setAttribute('aria-expanded', 'false');
     $('#menuBtn')?.setAttribute('aria-label', 'Prikaži meni');
     renderNav();
+    window.ToolsTracker?.refreshBadge();
     $('#pageTitle').textContent = navItems.find(x => x[0] === page)?.[2] || 'AutoDesk';
     const headSmall = document.querySelector('header small');
     if (headSmall) headSmall.textContent = (page === 'private' || page === 'fuel') ? 'Privatno' : 'Radionica';
-    $('#quickOrder')?.classList.toggle('hidden', page === 'private' || page === 'fuel');
+    $('#quickOrder')?.classList.toggle('hidden', page === 'private' || page === 'fuel' || page === 'tools');
 
     // Prazna ili druga stranica: prikaži učitavanje; ista stranica ostaje vidljiva uz traku na vrhu.
     const content = $('#content');
@@ -237,8 +239,8 @@ async function navigate(page, keep = false, fromPop = false) {
 
     try {
         // Lična vozila su zasebna celina: ne učitavaju podatke radionice i ne zavise od njih.
-        if (page === 'private' || page === 'fuel') {
-            await (page === 'fuel' ? FuelTracker : PrivateVehicles).render();
+        if (page === 'private' || page === 'fuel' || page === 'tools') {
+            await (page === 'fuel' ? FuelTracker : page === 'tools' ? ToolsTracker : PrivateVehicles).render();
             if (seq === navSeq) state.renderedPage = page;
             return;
         }

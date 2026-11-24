@@ -1103,3 +1103,34 @@ body::after { background: linear-gradient(90deg, transparent, var(--accent), tra
 .brand small { display: block; margin-top: 5px; color: var(--accent-hi); font: 700 10px/1 var(--f-body); letter-spacing: .21em; text-transform: uppercase; }
 .bootLogo { width: 120px; height: auto; border: 0; border-radius: 0; }
 #boot strong em { display: block; font-style: normal; color: #ffba08; }
+
+/* ================= Alati — licence ================= */
+.tlStats { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.tlGrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 16px; }
+.tlCard { position: relative; background: var(--card); border: 1px solid var(--line-strong); padding: 20px 20px 16px 24px; display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+.tlCard::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 4px; background: #4a4d53; }
+.tlCard.ok::before { background: var(--green); }
+.tlCard.soon::before { background: var(--gold); }
+.tlCard.expired::before { background: var(--red); }
+.tlCard.expired { background: linear-gradient(180deg, rgba(255, 82, 82, .07), var(--card) 60%); }
+.tlHead { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+.tlHead h3 { margin: 0; font-size: 22px; overflow-wrap: anywhere; }
+.tlHead .badge { margin: 2px 0 0; flex: none; font: 700 .85rem var(--f-display); letter-spacing: .06em; text-transform: uppercase; padding: 3px 10px; }
+.tlMeta { color: var(--muted); font-size: 13px; margin-top: 4px; overflow-wrap: anywhere; }
+.tlExp { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; padding: 12px 14px; background: rgba(0, 0, 0, .22); border: 1px solid var(--line); }
+.tlExp span { flex-basis: 100%; font: 700 10px var(--f-body); letter-spacing: .18em; text-transform: uppercase; color: var(--muted); }
+.tlExp strong { font: 800 italic 1.7rem/1 var(--f-display); letter-spacing: .02em; font-variant-numeric: tabular-nums; }
+.tlExp em { font-style: normal; font-weight: 600; font-size: 13px; color: var(--muted); }
+.tlCard.soon .tlExp strong, .tlCard.soon .tlExp em { color: var(--gold); }
+.tlCard.expired .tlExp strong, .tlCard.expired .tlExp em { color: var(--red); }
+.tlCard.ok .tlExp em { color: var(--green); }
+.tlRows { display: grid; gap: 6px; font-size: 13px; }
+.tlRows div { display: flex; justify-content: space-between; gap: 12px; border-bottom: 1px dashed var(--line); padding-bottom: 6px; }
+.tlRows span { color: var(--muted); }
+.tlRows b { font-weight: 600; text-align: right; overflow-wrap: anywhere; }
+.tlNotes { color: var(--muted); font-size: 13px; white-space: pre-wrap; overflow-wrap: anywhere; }
+.tlAct { margin-top: auto; display: flex; gap: 8px; flex-wrap: wrap; padding-top: 4px; }
+.tlAct button { padding: 9px 14px; font-size: .95rem; }
+.navBadge { margin-left: auto; min-width: 22px; height: 22px; padding: 0 6px; display: inline-grid; place-items: center; font: 800 .85rem var(--f-display); font-style: normal; color: #fff; background: var(--accent-deep); transform: skewX(-10deg); }
+@media (max-width: 900px) { .tlStats { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 560px) { .tlGrid { grid-template-columns: 1fr; } }

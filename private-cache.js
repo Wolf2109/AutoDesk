@@ -10,16 +10,16 @@
 const PrivateCache = (() => {
     const KEY = 'autodesk_private_cache_v1';
     // Dve odvojene grupe: 'service' (vozila + servisi) i 'fuel' (gorivo), svaka sa svojom sinhronizacijom.
-    const GROUPS = { service: ['vehicles', 'entries'], fuel: ['fuel'] };
-    const empty = () => ({ vehicles: [], entries: [], fuel: [], syncedAt: { service: 0, fuel: 0 } });
+    const GROUPS = { service: ['vehicles', 'entries'], fuel: ['fuel'], tools: ['tools'] };
+    const empty = () => ({ vehicles: [], entries: [], fuel: [], tools: [], syncedAt: { service: 0, fuel: 0, tools: 0 } });
     let mem = null, rerender = null, barKind = 'fuel';
 
     function load() {
         if (mem) return mem;
         try { mem = { ...empty(), ...JSON.parse(localStorage.getItem(KEY) || '{}') }; } catch (e) { mem = empty(); }
         // stara kopija je imala jedno vreme sinhronizacije za sve
-        if (typeof mem.syncedAt === 'number') mem.syncedAt = { service: mem.syncedAt, fuel: mem.syncedAt };
-        mem.syncedAt = { service: 0, fuel: 0, ...mem.syncedAt };
+        if (typeof mem.syncedAt === 'number') mem.syncedAt = { service: mem.syncedAt, fuel: mem.syncedAt, tools: 0 };
+        mem.syncedAt = { service: 0, fuel: 0, tools: 0, ...mem.syncedAt };
         return mem;
     }
     function save() {
@@ -74,7 +74,7 @@ const PrivateCache = (() => {
             b.disabled = true; b.textContent = 'Sinhronizacija…';
             try {
                 const c = await sync(kind);
-                toast(kind === 'fuel' ? `Gorivo sinhronizovano: ${c.fuel.length} unosa.` : `Servisi sinhronizovani: ${c.vehicles.length} vozila, ${c.entries.length} unosa.`);
+                toast(kind === 'tools' ? `Alati sinhronizovani: ${c.tools.length} uređaja.` : kind === 'fuel' ? `Gorivo sinhronizovano: ${c.fuel.length} unosa.` : `Servisi sinhronizovani: ${c.vehicles.length} vozila, ${c.entries.length} unosa.`);
                 await rerender();
             } catch (e) {
                 toast('Sinhronizacija nije uspela: ' + e.message);
