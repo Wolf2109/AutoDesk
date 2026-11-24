@@ -19,4 +19,4 @@ Isti kod kao web verzija, upakovan u pravu Android aplikaciju (Capacitor). APK g
 - Štampa i „Sačuvaj kao PDF“ otvaraju Android prozor za štampu (izaberi „Sačuvaj kao PDF“).
 - Izvoz JSON-a otvara Android „Podeli/Sačuvaj“ (Drive, Fajlovi, WhatsApp…).
 - Aplikacija ima svoje fajlove, Firebase SDK i fontove u APK-u, pa se pokreće i bez interneta.
-- Dugme „Nazad“ zatvara prozor, pa vraća na prethodnu stranu, kao i do sada.
+- Dugme „Nazad“ zatvara prozor ili meni, pa vraća na prethodni ekran; tek sa početne strane izlazi iz aplikacije.

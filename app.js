@@ -115,12 +115,31 @@ function setMenuOpen(open, fromPop = false) {
     }
 }
 
+/* Logički stek stranica: ne zavisi od istorije pregledača, pa „nazad“ uvek vodi na prethodni ekran. */
+const navStack = [];
+
 function onPopState(e) {
     if (ui.ignorePop > 0) { ui.ignorePop--; ui.backResolve?.(); return; }
     if (ui.modal) { closeModal(true); return; }
     if (ui.menu) { setMenuOpen(false, true); return; }
     const page = e.state?.page;
-    if (page && page !== state.page) navigate(page, true, true);
+    if (page && page !== state.page) {
+        if (navStack[navStack.length - 1] === page) navStack.pop();
+        navigate(page, true, true);
+    } else if (!page && state.page !== 'dashboard') {
+        // Unos istorije bez stranice (npr. preskočen unos): vrati na prethodni ekran umesto da se izađe.
+        navigate(navStack.pop() || 'dashboard', true, true);
+        history.pushState({ page: state.page }, '');
+    }
+}
+
+/** „Nazad“ u Android aplikaciji: zatvori prozor → zatvori meni → prethodni ekran → početna → izlaz. */
+function handleNativeBack() {
+    if (ui.modal || !$('#modal')?.classList.contains('hidden')) { closeModal(); return true; }
+    if (ui.menu || $('#sidebar')?.classList.contains('open')) { setMenuOpen(false); return true; }
+    if (navStack.length) { navigate(navStack.pop(), true, true); return true; }
+    if (state.page !== 'dashboard') { navigate('dashboard', true, true); return true; }
+    return false;                                   // početna: dozvoli izlaz iz aplikacije
 }
 
 const navItems = [
@@ -218,7 +237,11 @@ let navSeq = 0;
 async function navigate(page, keep = false, fromPop = false) {
     const seq = ++navSeq;
     if (ui.backDone) await ui.backDone;            // sačekaj da se završi „nazad“ koji je zatvorio prozor
-    if (!fromPop && !keep) pushPage(page);
+    if (!fromPop && !keep) {
+        pushPage(page);
+        if (state.page && state.page !== page && navStack[navStack.length - 1] !== state.page) navStack.push(state.page);
+        if (navStack.length > 30) navStack.shift();
+    }
     state.page = page;
     ui.menu = false;
     $('#sidebar')?.classList.remove('open');
@@ -1189,6 +1212,10 @@ async function init() {
     });
     history.replaceState({ page: 'dashboard' }, '');
     window.addEventListener('popstate', onPopState);
+    try {
+        const cap = window.Capacitor, capApp = cap?.isNativePlatform?.() && cap.Plugins?.App;
+        if (capApp?.addListener) capApp.addListener('backButton', () => { if (!handleNativeBack()) capApp.exitApp(); });
+    } catch (e) { console.warn('Dugme „nazad“ nije povezano:', e.message); }
     await navigate('dashboard');
     hideBoot();
     
