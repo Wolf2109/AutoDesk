@@ -1269,7 +1269,7 @@ async function init() {
     LocalAPI.autoBackup().catch(e => console.warn('Automatska kopija nije napravljena:', e.message));
 
     // Povremena provera oblaka (jedno čitanje) i prikaz stanja veze.
-    setInterval(async () => { try { await api('/settings'); } catch (e) { /* stanje se prikazuje ispod */ } syncStatus(); }, 60000);
+    setInterval(async () => { if (document.hidden || !navigator.onLine) return; try { await api('/settings'); } catch (e) { /* stanje se prikazuje ispod */ } syncStatus(); }, 60000);
     window.addEventListener('online', () => LocalAPI.refresh().then(syncStatus, syncStatus));
     window.addEventListener('offline', syncStatus);
     window.addEventListener('autodesk-private-sync', syncStatus);

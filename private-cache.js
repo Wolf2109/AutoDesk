@@ -12,6 +12,7 @@ const PrivateCache = (() => {
     // Dve odvojene grupe: 'service' (vozila + servisi) i 'fuel' (gorivo), svaka sa svojom sinhronizacijom.
     const GROUPS = { service: ['vehicles', 'entries'], fuel: ['fuel'], tools: ['tools'] };
     const empty = () => ({ vehicles: [], entries: [], fuel: [], tools: [], syncedAt: { service: 0, fuel: 0, tools: 0 } });
+    const syncing = new Map();
     let mem = null, flushing = null, rerender = null, barKind = 'fuel';
 
     function load() {
@@ -27,7 +28,13 @@ const PrivateCache = (() => {
     const strip = d => { const { created, ...rest } = d.data(); return { id: d.id, ...rest }; };
 
     /** Povlači samo jednu grupu iz Firebase-a; druga ostaje netaknuta. */
-    async function sync(kind) {
+    function sync(kind) {
+        if (syncing.has(kind)) return syncing.get(kind);
+        const task = syncGroup(kind).finally(() => syncing.delete(kind));
+        syncing.set(kind, task);
+        return task;
+    }
+    async function syncGroup(kind) {
         if (!GROUPS[kind]) throw Error('Nepoznata grupa podataka.');
         if (!navigator.onLine) throw Error('Nema internet veze.');
         await flush();

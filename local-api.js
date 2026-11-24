@@ -1,7 +1,7 @@
 'use strict';
 /*
  * "API" koji aplikacija koristi nad Firestore bazom (GitHub Pages izdanje nema server).
- *  - Evidencija (klijenti, vozila, nalozi, cenovnik, podešavanja) je jedan JSON bez fotografija.
+ *  - Evidencija se čuva lokalno kao JSON, a u Firestore-u kao pojedinačni zapisi sa revizijama.
  *  - Fotografije su zasebni dokumenti, smanjeni u pregledaču pre slanja.
  *  - Izmena uvek prvo proverava verziju u oblaku (jedno čitanje) i čuva se samo ako se verzija poklapa.
  *  - IndexedDB čuva lokalne izmene i osnovu za spajanje sa oblakom nakon povratka veze.
@@ -10,7 +10,7 @@ const LocalAPI = (() => {
   const DBNAME = 'autodesk-pages-v1';
   const STATUSES = ['received', 'in_progress', 'waiting', 'done', 'delivered'];
   const ACTIVE = ['received', 'in_progress', 'waiting'];
-  const RECHECK_MS = 300000;
+  const RECHECK_MS = 600000;
   const EUR_RATE = 120;
   const BACKUP_DAYS = [1, 7, 15, 30];
 
@@ -134,7 +134,7 @@ const LocalAPI = (() => {
 
   /* ---------- sinhronizacija ---------- */
   let snapshot = null, version = 0, lastCheck = 0, lastSync = 0, offline = false;
-  let initial = null, background = null, mutex = Promise.resolve();
+  let initial = null, mutex = Promise.resolve();
 
   let pendingBase = null, conflict = '', hydrated = false;
   const same = (a,b) => JSON.stringify(a) === JSON.stringify(b);
@@ -189,20 +189,25 @@ const LocalAPI = (() => {
         await migrate(local); version = await CloudSync.saveState(local,0); snapshot = local;
       } else { snapshot = emptyState(); version = 0; }
       await persist(snapshot,null,version);
-    } else if (!snapshot || meta.version !== version) {
+    } else if (!snapshot || meta.version !== version || (CloudSync.cacheMeta?.()?.generation && CloudSync.cacheMeta().generation !== meta.generation)) {
       const {meta:m,state} = await CloudSync.loadState(meta), s = normalize(state);
       version = m.version || 0;
       if (await migrate(s)) version = await CloudSync.saveState(s,version);
       await persist(s,null,version); snapshot = s;
     }
-    if (meta && meta.version === version && !pendingBase) CloudSync.primeCache(meta,snapshot);
+    if (meta && meta.version === version && !pendingBase) {
+      const hadMeta = CloudSync.cacheMeta?.();
+      CloudSync.primeCache(meta,snapshot);
+      // Repair old local copies missing the generation pointer, even when versions match.
+      if (!hadMeta || hadMeta.generation !== meta.generation) await persist(snapshot,null,version);
+    }
     lastCheck = lastSync = Date.now(); offline = false;
   }
   async function ensure(fresh) {
     if (!window.CloudSync?.ready) err('Firebase nije dostupan.');
     await hydrate();
     if (!navigator.onLine) { offline = true; if (!snapshot) err('Prvo učitavanje zahteva internet.'); return; }
-    if (!snapshot || !lastCheck || Date.now()-lastCheck > RECHECK_MS || (fresh && pendingBase)) {
+    if (!snapshot || !lastCheck || (Date.now()-lastCheck > RECHECK_MS && (typeof document === 'undefined' || !document.hidden || fresh)) || (fresh && pendingBase)) {
       try { initial ??= pull().finally(() => { initial = null; }); await initial; }
       catch(e) { offline = true; lastCheck = Date.now(); if (!snapshot) throw e; }
     }
@@ -312,30 +317,37 @@ const LocalAPI = (() => {
   /* ---------- rezervne kopije ---------- */
   const backupName = kind => kind === 'auto' ? localToday() + '_auto' : stamp().replace(/[:.]/g, '-') + '_' + kind;
   async function snapshotJson(s) { const c = clone(s); delete c.backups; return JSON.stringify(c); }
-  async function pruneBackups() {
-    const all = await CloudSync.listBackups();
+  async function pruneBackups(all = null) {
+    all ||= await CloudSync.listBackups();
     const autos = all.filter(b => b.kind === 'auto'), others = all.filter(b => b.kind !== 'auto');
     // Čuva se poslednjih 10 automatskih i 30 ručnih kopija.
     for (const b of [...autos.slice(10), ...others.slice(30)]) await CloudSync.deleteBackup(b.name).catch(() => {});
   }
-  async function makeBackup(kind = 'manual') {
+  async function makeBackup(kind = 'manual', existing = null) {
     const s = await read(true), name = backupName(kind);
     if (offline || pendingBase) err('Prvo sinhronizujte evidenciju.');
     await CloudSync.putBackup(name, await snapshotJson(s), kind);
-    await pruneBackups().catch(() => {});
+    await pruneBackups(existing ? [{name,kind,ts:Date.now()}, ...existing.filter(b => b.name !== name)] : null).catch(() => {});
     return name;
   }
   /** Pravi automatsku kopiju ako je od poslednje prošlo izabrani broj dana (1, 7, 15 ili 30). */
   async function autoBackup() {
     const st = await read(), days = BACKUP_DAYS.includes(Number(st.settings.backup_days)) ? Number(st.settings.backup_days) : 30;
     if (offline || pendingBase) return null;
-    const cached = Number(localStorage.getItem('autodesk_auto_backup_checked') || 0);
-    if (Date.now() - cached < 86400000) return null;
-    const last = (await CloudSync.listBackups()).find(b => b.kind === 'auto');
-    localStorage.setItem('autodesk_auto_backup_checked', String(Date.now()));
-    // Tolerancija od 6 sati: otvaranje aplikacije malo ranije u danu ne odlaže kopiju za ceo dan.
-    if (last && Date.now() - last.ts < days * 86400000 - 6 * 3600000) return null;
-    return makeBackup('auto');
+    const key = 'autodesk_auto_backup_schedule_v2';
+    let schedule = {};
+    try { schedule = JSON.parse(localStorage.getItem(key) || '{}'); } catch (_) {}
+    const now = Date.now(), interval = days * 86400000 - 6 * 3600000;
+    if (schedule.last && now - schedule.last < interval) return null;
+    const all = await CloudSync.listBackups();
+    const last = all.find(b => b.kind === 'auto');
+    if (last && now - last.ts < interval) {
+      localStorage.setItem(key, JSON.stringify({last:last.ts}));
+      return null;
+    }
+    const name = await makeBackup('auto', all);
+    localStorage.setItem(key, JSON.stringify({last:Date.now()}));
+    return name;
   }
 
   async function replaceAll(parsed) {
@@ -561,7 +573,7 @@ const LocalAPI = (() => {
       }
       if (method === 'POST') return { filename: await makeBackup('manual') };
       if (method === 'GET') return new Blob([await CloudSync.getBackup(decodeURIComponent(parts[1]))], { type: 'application/json' });
-      if (method === 'DELETE') { await CloudSync.deleteBackup(decodeURIComponent(parts[1])); return { ok: true }; }
+      if (method === 'DELETE') { await CloudSync.deleteBackup(decodeURIComponent(parts[1])); localStorage.removeItem('autodesk_auto_backup_schedule_v2'); return { ok: true }; }
     }
 
     err('Nepodržana operacija: ' + method + ' ' + url);
