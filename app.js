@@ -57,7 +57,7 @@ function hideBoot() {
     const b = $('#boot');
     if (!b) return;
     b.classList.add('done');
-    setTimeout(() => b.remove(), 350);
+    setTimeout(() => b.remove(), window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ? 0 : 350);
 }
 
 function bootFail(e) {
@@ -65,7 +65,8 @@ function bootFail(e) {
     clearBootTimers();
     const b = $('#boot');
     if (!b) return;
-    b.querySelector('.spinner')?.classList.add('hidden');
+    b.classList.add('failed');
+    b.querySelector('.bootProgress')?.classList.add('hidden');
     setBoot('Aplikacija nije mogla da se pokrene.');
     const hint = $('#bootHint');
     if (hint) hint.textContent = e?.message || '';
@@ -147,6 +148,7 @@ const navItems = [
     ['orders', '<svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 4h6v3H9z"/><path d="M8 5.5H6a2 2 0 00-2 2V19a2 2 0 002 2h12a2 2 0 002-2V7.5a2 2 0 00-2-2h-2"/><path d="M8 12h8M8 16h5"/></svg>', 'Radni nalozi'],
     ['clients', '<svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0116 0"/></svg>', 'Klijenti'],
     ['vehicles', '<svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 16l1.5-5.5A2 2 0 018.4 9h7.2a2 2 0 011.9 1.5L19 16"/><rect x="3" y="16" width="18" height="4" rx="1.5"/></svg>', 'Vozila'],
+    ['vehicle-search', '<svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="10" cy="10" r="6"/><path d="m14.5 14.5 6 6"/></svg>', 'Pretraga vozila'],
     ['services', '<svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16M4 12h16M4 18h10"/></svg>', 'Cenovnik'],
     ['stats', '<svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>', 'Statistika'],
     ['private', '<svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 13l2-5.5A2 2 0 016.9 6h10.2A2 2 0 0119 7.5L21 13"/><path d="M3 13h18v5a1 1 0 01-1 1h-2v-2H6v2H4a1 1 0 01-1-1z"/><circle cx="7.5" cy="15.5" r=".6"/><circle cx="16.5" cy="15.5" r=".6"/></svg>', 'Lična vozila'],
@@ -253,15 +255,21 @@ async function navigate(page, keep = false, fromPop = false) {
     $('#pageTitle').textContent = navItems.find(x => x[0] === page)?.[2] || 'AutoDesk';
     const headSmall = document.querySelector('header small');
     if (headSmall) headSmall.textContent = (page === 'private' || page === 'fuel') ? 'Privatno' : 'Radionica';
-    $('#quickOrder')?.classList.toggle('hidden', page === 'private' || page === 'fuel' || page === 'tools');
+    $('#quickOrder')?.classList.toggle('hidden', page === 'private' || page === 'fuel' || page === 'tools' || page === 'vehicle-search');
 
     // Prazna ili druga stranica: prikaži učitavanje; ista stranica ostaje vidljiva uz traku na vrhu.
     const content = $('#content');
     if (state.renderedPage !== page || !content.firstElementChild) content.innerHTML = loaderHtml();
+    if (!['fuel', 'orders', 'stats', 'private', 'tools', 'vehicle-search'].includes(page)) prepareContentMotion(page);
     document.body.classList.add('busy');
 
     try {
         // Lična vozila su zasebna celina: ne učitavaju podatke radionice i ne zavise od njih.
+        if (page === 'vehicle-search') {
+            await VehicleSearch.render();
+            if (seq === navSeq) state.renderedPage = page;
+            return;
+        }
         if (page === 'private' || page === 'fuel' || page === 'tools') {
             await (page === 'fuel' ? FuelTracker : page === 'tools' ? ToolsTracker : PrivateVehicles).render();
             if (seq === navSeq) state.renderedPage = page;
@@ -292,6 +300,15 @@ async function navigate(page, keep = false, fromPop = false) {
         if (seq === navSeq) document.body.classList.remove('busy');
     }
     syncStatus();
+}
+
+// Only a real page change gets the entrance animation; refreshes stay fully visible.
+function prepareContentMotion(page, filter = false) {
+    const content = $('#content');
+    const entering = content.dataset.motionPage !== page;
+    content.dataset.motionPage = page;
+    content.classList.toggle('page-enter', entering);
+    content.classList.toggle('filter-update', !entering && filter);
 }
 
 function periodRange(p) {
@@ -566,6 +583,7 @@ async function listPage(type, params = {}) {
         </section>
     `;
 
+    if (isOrder) prepareContentMotion('orders', true);
     $('#content').innerHTML = contentHtml;
     if (isOrder) {
         $('#finishAllOrders').onclick = async () => {
@@ -1073,6 +1091,7 @@ async function statsPage(range = null) {
     let q = '?from=' + range.from + '&to=' + range.to,
         s = await api('/stats' + q);
     state.firstDate = s.firstDate || '';
+    prepareContentMotion('stats', true);
         
     $('#content').innerHTML = 
         `<div class="panel"><h3>Izaberite period</h3>${dateControls(null, state.period)}</div>` +

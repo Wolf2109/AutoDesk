@@ -39,6 +39,7 @@ const FuelTracker = (() => {
         const tabs = years.length > 1 ? `<div class="pvTabs"><button class="${st.year ? '' : 'active'}" data-fy="">Sve godine</button>${years.map(y => `<button class="${st.year === y ? 'active' : ''}" data-fy="${y}">${y}</button>`).join('')}</div>` : '';
 
         if (!years.includes(st.mYear)) st.mYear = st.year || years[0] || '';
+        prepareContentMotion('fuel', true);
         $('#content').innerHTML = `
             ${PrivateCache.bar('fuel')}
             <div class="toolbar">
@@ -54,7 +55,7 @@ const FuelTracker = (() => {
             ${list.length ? body(list) : '<section class="panel"><div class="empty">Još nema unosa goriva.<br>Dodajte unos, uvezite JSON ili pritisnite „Sinhronizuj“.</div></section>'}`;
 
         PrivateCache.bind(render, 'fuel');
-        document.querySelectorAll('[data-fy]').forEach(b => b.onclick = () => { st.year = b.dataset.fy; if (st.year) st.mYear = st.year; st.limit = 30; render().catch(e => toast(e.message)); });
+        document.querySelectorAll('[data-fy]').forEach(b => b.onclick = () => { if (st.year === b.dataset.fy) return; st.year = b.dataset.fy; if (st.year) st.mYear = st.year; st.limit = 30; render().catch(e => toast(e.message)); });
         $('#fuAdd').onclick = () => entryForm();
         $('#fuImport').onclick = () => $('#fuFile').click();
         $('#fuFile').onchange = onFile;

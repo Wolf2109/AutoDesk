@@ -1136,3 +1136,40 @@ body::after { background: linear-gradient(90deg, transparent, var(--accent), tra
 @media (max-width: 560px) { .tlGrid { grid-template-columns: 1fr; } }
 
 #dtcResults{display:grid;gap:6px;margin:8px 0}.dtcResult{text-align:left;white-space:normal;overflow-wrap:anywhere;width:100%}
+
+/* Vehicle catalogue */
+.vs-filters{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,210px),1fr));gap:16px;margin:18px 0 24px;align-items:start}.vs-picker{position:relative;min-width:0}.vs-input{display:flex;gap:4px}.vs-input input{flex:1;min-width:0;width:100%}.vs-toggle{flex:0 0 40px;background:var(--card-hi);color:var(--text);border:1px solid var(--line-strong);font-size:20px}.vs-options{max-height:260px;overflow:auto;background:var(--card);border:1px solid var(--line-strong);margin-top:4px}.vs-options[hidden]{display:none}.vs-option{display:block;width:100%;text-align:left;padding:12px;border:0;border-bottom:1px solid var(--line);background:transparent;color:var(--text);font:inherit}.vs-option:hover,.vs-option.vs-active{background:var(--accent-soft)}.vs-results{display:grid;gap:12px}.vs-card{border:1px solid var(--line-strong);background:var(--card-hi);padding:16px;min-width:0}.vs-card h4{margin:0 0 12px;color:var(--text);font-size:17px}.vs-details{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,150px),1fr));gap:12px;margin:0}.vs-details dt{font-size:12px;color:var(--muted)}.vs-details dd{margin:4px 0 0;overflow-wrap:anywhere;font-weight:600}.vs-options p{padding:8px}.vs-host .vs-results,.vs-host .vs-picker{animation:none!important}
+.vs-engine-heading{margin:16px 0 6px;font-size:13px;color:var(--muted)}.vs-engine{border-top:1px solid var(--line);padding:12px 0;display:grid;gap:9px}.vs-engine:last-child{padding-bottom:0}.vs-engine>strong{font-size:14px;overflow-wrap:anywhere}
+.vs-module-tabs{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:16px 0}.vs-module-tab{padding:16px;border:1px solid var(--line-strong);background:var(--card-hi);color:var(--text);font:inherit;font-weight:700;border-radius:10px;cursor:pointer}.vs-module-tab.is-active{border-color:var(--accent);background:var(--accent-soft);box-shadow:inset 0 -2px var(--accent)}.vs-module-tab:focus-visible{outline:2px solid var(--accent);outline-offset:3px}.vs-search-label{display:block;margin:10px 0 6px;color:var(--muted);font-size:13px}.vs-result-search{width:100%;box-sizing:border-box}.vs-module-tab,.vs-result-search{animation:none!important}
+
+.vs-card h4 .vs-module-model{color:#ef4444;font-weight:700;}
+
+/* Vehicle search — shared AutoDesk typography and restrained local motion. */
+.vs-host{overflow:visible;font-family:var(--f-body)}
+.vs-host .vs-filters{grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;align-items:start}
+.vs-host .vs-picker{gap:7px;min-width:0;z-index:1}
+.vs-host .vs-picker.is-open{z-index:25}
+.vs-host .vs-picker label,.vs-search-label{font:700 14px/1.2 var(--f-display);text-transform:uppercase;letter-spacing:.09em;color:var(--muted)}
+.vs-host .vs-input{position:relative;display:flex;gap:0;border:1px solid var(--line-strong);background:var(--secondary,#161719);border-radius:0;transition:border-color .18s ease,box-shadow .18s ease;min-height:46px}
+.vs-host .vs-input:hover{border-color:var(--muted)}
+.vs-host .vs-input:focus-within,.vs-host .is-open .vs-input{border-color:var(--gold,#ffba08);box-shadow:0 0 0 2px rgba(255,186,8,.10)}
+.vs-host .vs-input input{border:0!important;box-shadow:none!important;outline:none!important;background:transparent!important;min-width:0;padding:12px;font:500 14px/1.4 var(--f-body);border-radius:0;color:var(--text)}
+.vs-host .vs-toggle{display:grid;place-items:center;flex:0 0 44px;padding:0;border:0;border-left:1px solid var(--line);border-radius:0;background:transparent;color:var(--muted);cursor:pointer;transform:none!important}
+.vs-toggle svg{transition:transform .2s ease,color .2s ease;pointer-events:none}
+.vs-host .vs-toggle:hover,.vs-host .is-open .vs-toggle{color:var(--gold,#ffba08)}
+.vs-host .is-open .vs-toggle svg{transform:rotate(180deg)}
+.vs-host .vs-options{position:absolute;top:100%;left:0;right:0;margin-top:6px;max-height:var(--vs-available,260px);overflow:auto;overscroll-behavior:contain;scrollbar-width:thin;scrollbar-color:var(--line-strong) var(--card);background:var(--card-hi);border:1px solid var(--line-strong);box-shadow:0 12px 30px #0008;padding:4px;transform-origin:top;z-index:30}
+.vs-host .opens-up .vs-options{top:auto;bottom:100%;margin-top:0;margin-bottom:6px;transform-origin:bottom}
+.vs-host .vs-option{position:relative;min-height:42px;padding:10px 30px 10px 12px;border:0;border-radius:0;font:500 13px/1.45 var(--f-body);white-space:normal;overflow-wrap:anywhere;cursor:pointer;transition:background .14s ease,color .14s ease;transform:none!important}
+.vs-host .vs-option[aria-selected=true]{color:var(--gold,#ffba08);background:rgba(255,186,8,.07)}
+.vs-host .vs-option[aria-selected=true]::after{content:'';position:absolute;right:14px;top:50%;width:9px;height:5px;border-left:2px solid currentColor;border-bottom:2px solid currentColor;transform:translateY(-65%) rotate(-45deg)}
+.vs-host .vs-option:hover,.vs-host .vs-option.vs-active{background:var(--accent-soft);color:var(--text);box-shadow:inset 2px 0 var(--accent)}
+.vs-host .vs-module-tab{border-radius:0;font:800 italic 1.25rem/1.2 var(--f-display);letter-spacing:.06em;transition:background .18s ease,border-color .18s ease,box-shadow .18s ease;transform:none!important}
+.vs-host .vs-module-tab.is-active{background:linear-gradient(110deg,var(--accent-soft),transparent);box-shadow:inset 0 -2px var(--accent)}
+.vs-host .vs-result-search{font:500 14px/1.4 var(--f-body);min-height:46px;border-radius:0}
+.vs-host .vs-card h4{font:800 1.45rem/1.2 var(--f-display);letter-spacing:.025em;overflow-wrap:anywhere}
+.vs-host .vs-engine-heading{font:700 1rem/1.3 var(--f-display);text-transform:uppercase;letter-spacing:.07em}
+.vs-host .vs-card{border-left:2px solid var(--accent);background:linear-gradient(135deg,var(--card-hi),var(--card))}
+@media(max-width:760px){.vs-host .vs-filters{grid-template-columns:1fr;gap:12px}.vs-host .vs-input input,.vs-host .vs-result-search{font-size:16px}.vs-host .vs-option{min-height:46px;font-size:14px}}
+@media(prefers-reduced-motion:no-preference){.vs-host .vs-options:not([hidden]){animation:vsMenuOpen .16s cubic-bezier(.2,.75,.25,1) both}.vs-host .vs-picker:not(:first-child) .vs-input{animation:vsFieldIn .18s ease-out both}@keyframes vsMenuOpen{from{transform:scaleY(.96) translateY(-3px)}to{transform:scaleY(1) translateY(0)}}@keyframes vsFieldIn{from{transform:translateY(3px)}to{transform:translateY(0)}}}
+@media(prefers-reduced-motion:reduce){.vs-host *{transition:none!important;animation:none!important}}

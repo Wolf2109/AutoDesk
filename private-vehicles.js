@@ -78,6 +78,7 @@ const PrivateVehicles = (() => {
             <section class="panel pvPanel" id="pvTable"></section>`;
         }
 
+        prepareContentMotion('private', true);
         $('#content').innerHTML = `
             ${PrivateCache.bar('service')}
             <div class="toolbar">

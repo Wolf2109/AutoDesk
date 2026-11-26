@@ -45,6 +45,7 @@ const ToolsTracker = (() => {
             (!q || [e.name, e.model, e.serial, e.license, e.notes].some(v => String(v || '').toLowerCase().includes(q))));
         const tab = (k, label, n) => `<button class="${st.filter === k ? 'active' : ''}" data-tf="${k}">${label}${n !== undefined ? ` (${n})` : ''}</button>`;
 
+        prepareContentMotion('tools', true);
         $('#content').innerHTML = `
             ${PrivateCache.bar('tools')}
             <div class="toolbar">

@@ -1,6 +1,6 @@
 'use strict';
-const CACHE = 'autodesk-ui-20261126-v28-motion';
-const FILES = ['./', './index.html', './style.css', './site-theme.css', './motion.css?v=27', './firebase-config.js', './app.js', './dtc.js', './dtc-database.json', './native-bridge.js', './print-docs.js', './local-api.js', './cloud-sync.js', './private-cache.js', './private-vehicles.js', './fuel.js', './tools.js', './manifest.json', './favicon.ico', './slike/logo.png', './slike/logo-mark.png', './icons/icon-192.png', './icons/icon-512.png'];
+const CACHE = 'autodesk-ui-20261126-v40-vehicle-dropdowns';
+const FILES = ['./', './index.html', './style.css', './site-theme.css', './motion.css?v=31', './firebase-config.js', './app.js', './dtc.js', './vehicle-search.js', './vehicle-search-config.js', './dtc-database.json', './native-bridge.js', './print-docs.js', './local-api.js', './cloud-sync.js', './private-cache.js', './private-vehicles.js', './fuel.js', './tools.js', './manifest.json', './favicon.ico', './slike/logo.png', './slike/logo-mark.png', './icons/icon-192.png', './icons/icon-512.png'];
 const SDK = 'https://www.gstatic.com/firebasejs/';
 
 self.addEventListener('install', e => e.waitUntil(caches.open(CACHE).then(c => c.addAll(FILES)).then(() => self.skipWaiting())));

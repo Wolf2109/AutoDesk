@@ -6,7 +6,7 @@
  */
 
 :root {
-    --ease-out: cubic-bezier(.2, .75, .2, 1);
+    --ease-out: cubic-bezier(.16, 1, .3, 1);
     --ease-in-out: cubic-bezier(.65, 0, .35, 1);
     --dur-fast: .16s;
     --dur-base: .24s;
@@ -62,25 +62,25 @@ button:active:not(:disabled) { transform: translateY(0) scale(.98); transition-d
     .loginBox { animation: adRise .5s var(--ease-out) backwards; }
 
     /* Promena stranice: kratak, tih ulaz sadržaja uz blago kašnjenje po redu */
-    #content > :not(.loader) { animation: adPage .34s var(--ease-out) backwards; }
-    #content > :nth-child(2) { animation-delay: .04s; }
-    #content > :nth-child(3) { animation-delay: .08s; }
-    #content > :nth-child(4) { animation-delay: .12s; }
-    #content > :nth-child(n+5) { animation-delay: .16s; }
+    #content.page-enter > :not(.loader) { animation: adPage .32s var(--ease-out) backwards; }
+    #content.page-enter > :nth-child(2) { animation-delay: .04s; }
+    #content.page-enter > :nth-child(3) { animation-delay: .08s; }
+    #content.page-enter > :nth-child(4) { animation-delay: .09s; }
+    #content.page-enter > :nth-child(n+5) { animation-delay: .10s; }
 
     /* Indikator aktivne stavke u meniju raste od sredine pri izboru */
     nav button.active::before { animation: adMark .32s var(--ease-out) backwards; }
 
     /* Grafikon se otkriva sleva nadesno, a brojke se pojave tek kada linija stigne */
-    .chart { animation: adWipe .95s var(--ease-in-out) .12s backwards; }
-    .cv, .cx, .cy { animation: adFade .4s ease .7s backwards; }
+    #content.page-enter .chart { animation: adWipe .75s var(--ease-in-out) .12s backwards; }
+    #content.page-enter .cv, #content.page-enter .cx, #content.page-enter .cy { animation: adFade .4s ease .48s backwards; }
 
     /* Trake u izveštajima rastu od leve ivice */
-    .barrow .bar { transform-origin: left center; animation: adGrow .6s var(--ease-out) backwards; }
-    .barrow:nth-child(2) .bar { animation-delay: .05s; }
-    .barrow:nth-child(3) .bar { animation-delay: .1s; }
-    .barrow:nth-child(4) .bar { animation-delay: .15s; }
-    .barrow:nth-child(n+5) .bar { animation-delay: .2s; }
+    #content.page-enter .barrow .bar { transform-origin: left center; animation: adGrow .52s var(--ease-out) backwards; }
+    #content.page-enter .barrow:nth-child(2) .bar { animation-delay: .05s; }
+    #content.page-enter .barrow:nth-child(3) .bar { animation-delay: .1s; }
+    #content.page-enter .barrow:nth-child(4) .bar { animation-delay: .15s; }
+    #content.page-enter .barrow:nth-child(n+5) .bar { animation-delay: .2s; }
 
     /* Prozori */
     .modal:not(.hidden) { animation: adFade .2s ease backwards; }
@@ -102,7 +102,7 @@ button:active:not(:disabled) { transform: translateY(0) scale(.98); transition-d
         from { opacity: 0; transform: translateY(10px); }
     }
     @keyframes adPage {
-        from { opacity: 0; transform: translateY(8px); }
+        from { opacity: 0; transform: translateY(5px); }
     }
     @keyframes adFade {
         from { opacity: 0; }
@@ -118,10 +118,42 @@ button:active:not(:disabled) { transform: translateY(0) scale(.98); transition-d
         from { transform: scaleX(0); }
     }
     @keyframes adDialog {
-        from { opacity: 0; transform: translateY(14px) scale(.985); }
+        from { opacity: 0; transform: translateY(9px) scale(.99); }
     }
     @keyframes adToast {
-        from { opacity: 0; transform: translateY(12px); }
+        from { opacity: 0; transform: translateY(7px); }
     }
 }
 
+
+/* Usklađeni prelazi mobilnog menija i indikatora učitavanja. */
+@media (max-width: 760px) {
+    #sidebar { transition: transform .30s var(--ease-out); }
+    #menuBackdrop { display: block; position: fixed; inset: 0; z-index: 1100; background: rgba(0,0,0,.48); opacity: 0; visibility: hidden; pointer-events: none; transition: opacity .25s var(--ease-out), visibility 0s .25s; }
+    #menuBackdrop.visible { opacity: 1; visibility: visible; pointer-events: auto; transition-delay: 0s; animation: none; }
+}
+@media (prefers-reduced-motion: no-preference) {
+    .spinner { animation-duration: .95s; }
+    .loader { animation: loaderIn .24s .12s both; }
+    body.busy::after { animation-duration: 1.35s; }
+}
+@media (prefers-reduced-motion: reduce) {
+    .spinner { animation: none; }
+    .loader { animation: none; opacity: 1; }
+    .dialog, .modal, #toast, #banner { animation: none !important; }
+    button:active:not(:disabled) { transform: none; }
+}
+
+/* Filter changes never hide the page or replay chart reveals. */
+#content:not(.page-enter) > * , #content:not(.page-enter) #filtersPanel { animation: none; }
+@media (prefers-reduced-motion: no-preference) {
+    #content.filter-update > .fuStats, #content.filter-update > .fuPanel,
+    #content.filter-update > .fuTwo, #content.filter-update > .statsGrid,
+    #content.filter-update > .twoCol, #content.filter-update > #tableContainer,
+    #content.filter-update > .tlGrid,
+    #content.filter-update > section.panel { animation: adFilterSettle .22s var(--ease-out) both; }
+    @keyframes adFilterSettle { from { transform: translateY(3px); } to { transform: translateY(0); } }
+}
+
+/* Alati: zbirne kartice ostaju mirne pri promeni filtera. */
+#content.filter-update > .tlStats { animation: none; }

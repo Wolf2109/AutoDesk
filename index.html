@@ -10,23 +10,52 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="stylesheet" href="./style.css">
-    <link rel="stylesheet" href="./motion.css?v=27">
+    <link rel="stylesheet" href="./motion.css?v=31">
     <!-- Fontovi se učitavaju bez blokiranja prvog prikaza -->
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:ital,wght@0,600;0,700;0,800;1,700;1,800;1,900&family=Public+Sans:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
     <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:ital,wght@0,600;0,700;0,800;1,700;1,800;1,900&family=Public+Sans:wght@400;500;600;700&display=swap"></noscript>
     <style>
-        /* Splash: okretanje kruga ne sme da zavisi ni od jednog drugog CSS fajla (ni od starog keša) */
-        #boot .spinner { animation: spin .8s linear infinite; }
-        @media (prefers-reduced-motion: reduce) { #boot .spinner { animation-duration: 2.4s; } }
+        /* Kritični splash stilovi: nezavisni od spoljnog CSS-a i fontova. */
+        #boot { position: fixed; inset: 0; z-index: 3000; display: grid; place-items: center; overflow: hidden; isolation: isolate; background: #111214; color: #f4f4f5; padding: 24px; transition: opacity .32s ease; }
+        #boot::before { content: ''; position: absolute; inset: 0; z-index: -1; background: radial-gradient(ellipse at 50% 42%, #292024 0%, transparent 57%), repeating-linear-gradient(125deg, transparent 0 47px, rgba(255,255,255,.025) 48px 49px); }
+        #boot.done { opacity: 0; pointer-events: none; }
+        #boot .bootInner { width: min(100%, 340px); max-width: 340px; gap: 0; text-align: center; display: flex; align-items: center; flex-direction: column; transition: transform .32s cubic-bezier(.2,.75,.2,1); }
+        #boot.done .bootInner { transform: translateY(-8px) scale(.98); }
+        .bootMark { position: relative; display: grid; place-items: center; width: 156px; height: 112px; margin-bottom: 20px; }
+        #boot .bootLogo { width: 112px; height: auto; border: 0; border-radius: 0; object-fit: contain; }
+        #boot .bootBrand { font: italic 800 clamp(25px, 7vw, 34px)/1.02 'Barlow Condensed', 'Arial Narrow', sans-serif; text-transform: uppercase; letter-spacing: .025em; }
+        #boot .bootBrand em { display: block; color: #ffba08; font-style: normal; }
+        .bootCaption { margin-top: 10px; color: #b2b4b8; font: 600 10px/1.4 system-ui,sans-serif; letter-spacing: .24em; text-transform: uppercase; }
+        #boot .bootProgress { position: relative; width: 148px; height: 3px; margin: 30px 0 13px; overflow: hidden; border: 0; border-radius: 2px; background: #ffffff18; }
+        #boot .bootProgress::after { content: ''; position: absolute; inset: 0; width: 45%; background: linear-gradient(90deg,#e3212b,#ffba08); border-radius: inherit; }
+        #boot #bootText { color: #b2b4b8; font: 500 12px/1.5 system-ui,sans-serif; }
+        #boot .bootHint { min-height: 0; margin-top: 10px; color: #ffba08; font-size: 12px; }
+        #boot .bootHint:empty { display: none; }
+        #bootRetry { margin-top: 14px; }
+        #boot .hidden { display: none !important; }
+        @media (prefers-reduced-motion: no-preference) {
+            .bootMark { animation: bootEnter .55s cubic-bezier(.16,1,.3,1) both; }
+            .bootBrand, .bootCaption { animation: bootType .48s cubic-bezier(.16,1,.3,1) .09s both; }
+            .bootCaption { animation-delay: .15s; }
+            #boot .bootProgress::after { animation: bootSweep 1.45s cubic-bezier(.45,0,.55,1) infinite; }
+            @keyframes bootEnter { from { opacity: 0; transform: scale(.88); } to { opacity: 1; transform: scale(1); } }
+            @keyframes bootType { from { opacity: 0; transform: translateY(9px); } to { opacity: 1; transform: translateY(0); } }
+            @keyframes bootSweep { from { transform: translateX(-110%); } to { transform: translateX(230%); } }
+        }
+        #boot.done .bootProgress::after { animation: none; }
+        @media (prefers-reduced-motion: reduce) { #boot, #boot .bootInner { transition: none; } #boot.done .bootInner { transform: none; } }
     </style>
     <title>AutoDesk | Radionica</title>
 </head>
 <body>
     <div id="boot" role="status" aria-live="polite">
         <div class="bootInner">
-            <img class="bootLogo" src="./slike/logo-mark.png" alt="">
-            <strong translate="no">Auto dijagnostika <em>Lazarević</em></strong>
-            <div class="spinner" aria-hidden="true"></div>
+            <div class="bootMark" aria-hidden="true">
+                <img class="bootLogo" src="./slike/logo-mark.png" alt="">
+            </div>
+            <strong class="bootBrand" translate="no">Auto dijagnostika <em>Lazarević</em></strong>
+            <span class="bootCaption">AutoDesk · Evidencija radionice</span>
+            <div class="bootProgress" aria-hidden="true"></div>
             <p id="bootText">Pokretanje aplikacije…</p>
             <p id="bootHint" class="bootHint"></p>
             <button id="bootRetry" class="secondary hidden" type="button">Osveži stranicu</button>
@@ -101,6 +130,8 @@
     <script src="./fuel.js"></script>
     <script src="./tools.js"></script>
     <script src="./dtc.js"></script>
+    <script src="./vehicle-search-config.js"></script>
+    <script src="./vehicle-search.js"></script>
     <script src="./app.js" defer></script>
 </body>
 </html>
