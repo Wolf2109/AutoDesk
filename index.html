@@ -10,10 +10,15 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="stylesheet" href="./style.css">
-    <link rel="stylesheet" href="./motion.css">
+    <link rel="stylesheet" href="./motion.css?v=27">
     <!-- Fontovi se učitavaju bez blokiranja prvog prikaza -->
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:ital,wght@0,600;0,700;0,800;1,700;1,800;1,900&family=Public+Sans:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
     <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:ital,wght@0,600;0,700;0,800;1,700;1,800;1,900&family=Public+Sans:wght@400;500;600;700&display=swap"></noscript>
+    <style>
+        /* Splash: okretanje kruga ne sme da zavisi ni od jednog drugog CSS fajla (ni od starog keša) */
+        #boot .spinner { animation: spin .8s linear infinite; }
+        @media (prefers-reduced-motion: reduce) { #boot .spinner { animation-duration: 2.4s; } }
+    </style>
     <title>AutoDesk | Radionica</title>
 </head>
 <body>

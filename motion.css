@@ -58,16 +58,6 @@ button:active:not(:disabled) { transform: translateY(0) scale(.98); transition-d
 /* ---------- Animacije (samo ako korisnik nije tražio smanjeno kretanje) ---------- */
 @media (prefers-reduced-motion: no-preference) {
 
-    /* Pokretanje: logo i naslov se pojave jedan za drugim, pa ekran nestaje glatko */
-    .bootInner > * { animation: adRise .5s var(--ease-out) backwards; }
-    .bootInner > :nth-child(2) { animation-delay: .06s; }
-    .bootInner > :nth-child(3) { animation-delay: .12s; }
-    .bootInner > :nth-child(4) { animation-delay: .18s; }
-    /* JS uklanja splash posle 350 ms, zato je nestajanje kraće od toga */
-    #boot { transition: opacity .32s var(--ease-in-out), visibility 0s linear .32s; }
-    #boot.done { visibility: hidden; }
-    #boot.done .bootInner { transform: translateY(-6px) scale(.985); transition: transform .32s var(--ease-in-out); }
-
     /* Prijava */
     .loginBox { animation: adRise .5s var(--ease-out) backwards; }
 
@@ -135,7 +125,3 @@ button:active:not(:disabled) { transform: translateY(0) scale(.98); transition-d
     }
 }
 
-/* Pri smanjenom kretanju nema pomeranja, samo trenutni prikaz */
-@media (prefers-reduced-motion: reduce) {
-    #boot { transition: opacity .2s linear !important; }
-}
