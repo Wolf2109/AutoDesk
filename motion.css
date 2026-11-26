@@ -1,0 +1,141 @@
+/*
+ * AutoDesk – animacije i prelazi.
+ * Samo vizuelni sloj: ne menja markup, logiku ni raspored. Učitava se posle style.css.
+ * Pravilo: kretanje prati radnju korisnika (otvaranje, izbor, potvrda), a ne ukrašava.
+ * Jedan zapaženi trenutak: grafikon i trake na početnoj/statistici se iscrtavaju.
+ */
+
+:root {
+    --ease-out: cubic-bezier(.2, .75, .2, 1);
+    --ease-in-out: cubic-bezier(.65, 0, .35, 1);
+    --dur-fast: .16s;
+    --dur-base: .24s;
+    --dur-slow: .38s;
+}
+
+/* ---------- Prelazi (rade i kada je kretanje smanjeno, bez pomeranja) ---------- */
+button {
+    transition:
+        background-color var(--dur-fast) var(--ease-out),
+        border-color var(--dur-fast) var(--ease-out),
+        color var(--dur-fast) var(--ease-out),
+        box-shadow var(--dur-base) var(--ease-out),
+        transform var(--dur-fast) var(--ease-out),
+        opacity var(--dur-fast) var(--ease-out);
+}
+
+input, select, textarea {
+    transition: border-color var(--dur-fast) var(--ease-out), box-shadow var(--dur-base) var(--ease-out), background-color var(--dur-fast) var(--ease-out);
+}
+
+tbody tr { transition: background-color var(--dur-fast) var(--ease-out); }
+
+.stat, .panel, .remRow, .pvTabs button {
+    transition: border-color var(--dur-base) var(--ease-out), background-color var(--dur-base) var(--ease-out), color var(--dur-fast) var(--ease-out);
+}
+
+nav button { transition: background-color var(--dur-base) var(--ease-out), color var(--dur-base) var(--ease-out), box-shadow var(--dur-base) var(--ease-out); }
+nav button svg { transition: color var(--dur-base) var(--ease-out), transform var(--dur-base) var(--ease-out); }
+
+#serverDot { transition: color .4s var(--ease-out), filter .4s var(--ease-out); }
+.badge { transition: color var(--dur-base), background-color var(--dur-base), border-color var(--dur-base); }
+
+.bar, .barrow .bar { transition: width .5s var(--ease-out); }
+
+/* Povratna informacija na dodir/klik: samo tamo gde postoji pokazivač, da na telefonu ne ostane "zalepljen" hover */
+@media (hover: hover) {
+    .primary:hover:not(:disabled):not(:active),
+    .secondary:hover:not(:disabled):not(:active),
+    .ghost:hover:not(:disabled):not(:active),
+    .danger:hover:not(:disabled):not(:active) { transform: translateY(-1px); }
+    .primary:hover:not(:disabled):not(:active) { box-shadow: 0 10px 26px -10px rgba(227, 33, 43, .75); }
+    nav button:hover svg { transform: scale(1.08); }
+    .photoGrid img { transition: transform .35s var(--ease-out), filter .35s var(--ease-out); }
+    .photoGrid img:hover { transform: scale(1.02); filter: brightness(1.06); }
+}
+button:active:not(:disabled) { transform: translateY(0) scale(.98); transition-duration: .06s; }
+
+/* ---------- Animacije (samo ako korisnik nije tražio smanjeno kretanje) ---------- */
+@media (prefers-reduced-motion: no-preference) {
+
+    /* Pokretanje: logo i naslov se pojave jedan za drugim, pa ekran nestaje glatko */
+    .bootInner > * { animation: adRise .5s var(--ease-out) backwards; }
+    .bootInner > :nth-child(2) { animation-delay: .06s; }
+    .bootInner > :nth-child(3) { animation-delay: .12s; }
+    .bootInner > :nth-child(4) { animation-delay: .18s; }
+    /* JS uklanja splash posle 350 ms, zato je nestajanje kraće od toga */
+    #boot { transition: opacity .32s var(--ease-in-out), visibility 0s linear .32s; }
+    #boot.done { visibility: hidden; }
+    #boot.done .bootInner { transform: translateY(-6px) scale(.985); transition: transform .32s var(--ease-in-out); }
+
+    /* Prijava */
+    .loginBox { animation: adRise .5s var(--ease-out) backwards; }
+
+    /* Promena stranice: kratak, tih ulaz sadržaja uz blago kašnjenje po redu */
+    #content > :not(.loader) { animation: adPage .34s var(--ease-out) backwards; }
+    #content > :nth-child(2) { animation-delay: .04s; }
+    #content > :nth-child(3) { animation-delay: .08s; }
+    #content > :nth-child(4) { animation-delay: .12s; }
+    #content > :nth-child(n+5) { animation-delay: .16s; }
+
+    /* Indikator aktivne stavke u meniju raste od sredine pri izboru */
+    nav button.active::before { animation: adMark .32s var(--ease-out) backwards; }
+
+    /* Grafikon se otkriva sleva nadesno, a brojke se pojave tek kada linija stigne */
+    .chart { animation: adWipe .95s var(--ease-in-out) .12s backwards; }
+    .cv, .cx, .cy { animation: adFade .4s ease .7s backwards; }
+
+    /* Trake u izveštajima rastu od leve ivice */
+    .barrow .bar { transform-origin: left center; animation: adGrow .6s var(--ease-out) backwards; }
+    .barrow:nth-child(2) .bar { animation-delay: .05s; }
+    .barrow:nth-child(3) .bar { animation-delay: .1s; }
+    .barrow:nth-child(4) .bar { animation-delay: .15s; }
+    .barrow:nth-child(n+5) .bar { animation-delay: .2s; }
+
+    /* Prozori */
+    .modal:not(.hidden) { animation: adFade .2s ease backwards; }
+    .modal:not(.hidden) .dialog { animation: adDialog .3s var(--ease-out) backwards; }
+
+    /* Obaveštenje (JS ga prikazuje preko display:block) */
+    #toast { animation: adToast .32s var(--ease-out) backwards; }
+
+    /* Meni na telefonu */
+    #menuBackdrop.visible { animation: adFade .25s ease backwards; }
+
+    /* Traka zauzetosti na vrhu: mekši hod */
+    body.busy::after { animation-timing-function: var(--ease-in-out); }
+
+    /* Stavka koja čeka sinhronizaciju / greška u traci */
+    #banner { animation: adFade .3s ease backwards; }
+
+    @keyframes adRise {
+        from { opacity: 0; transform: translateY(10px); }
+    }
+    @keyframes adPage {
+        from { opacity: 0; transform: translateY(8px); }
+    }
+    @keyframes adFade {
+        from { opacity: 0; }
+    }
+    @keyframes adMark {
+        from { transform: scaleY(0); opacity: 0; }
+    }
+    @keyframes adWipe {
+        from { clip-path: inset(0 100% 0 0); }
+        to { clip-path: inset(0 0 0 0); }
+    }
+    @keyframes adGrow {
+        from { transform: scaleX(0); }
+    }
+    @keyframes adDialog {
+        from { opacity: 0; transform: translateY(14px) scale(.985); }
+    }
+    @keyframes adToast {
+        from { opacity: 0; transform: translateY(12px); }
+    }
+}
+
+/* Pri smanjenom kretanju nema pomeranja, samo trenutni prikaz */
+@media (prefers-reduced-motion: reduce) {
+    #boot { transition: opacity .2s linear !important; }
+}
