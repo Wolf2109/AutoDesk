@@ -81,62 +81,10 @@ jobs:
           name: AutoDesk-apk
           path: AutoDesk.apk
 
-      - name: Objava (Releases, strana „apk-latest“)
+      - name: Publish signed Android update
+        if: github.ref == 'refs/heads/main' && env.SIGNED == 'true'
         run: |
-          gh release delete apk-latest --cleanup-tag -y || true
-
-          cat > release-notes.md <<'EOF'
-          # AutoDesk V2
-
-          AutoDesk je aplikacija namenjena digitalnom upravljanju
-          poslovanjem auto-servisa, evidenciji vozila, klijenata,
-          servisnih intervencija i radnih naloga.
-
-          ## Glavne funkcionalnosti
-
-          - Upravljanje klijentima i vozilima
-          - Kreiranje i uređivanje radnih naloga
-          - Evidencija servisnih intervencija i istorije vozila
-          - DTC baza dijagnostičkih kodova grešaka
-          - Štampanje radnih naloga i izvoz u PDF
-          - Evidencija i čuvanje fotografija vozila
-          - Upravljanje alatima i opremom
-          - Evidencija ličnih vozila i potrošnje goriva
-          - Pregled statistike poslovanja
-          - Sinhronizacija podataka putem Firebase platforme
-          - Automatsko kreiranje rezervnih kopija
-          - Podrška za rad bez internet konekcije
-
-          ## Optimizacija i performanse
-
-          - Brzo učitavanje podataka iz lokalnog keša
-          - Optimizovana potrošnja Firebase resursa
-          - Inkrementalna sinhronizacija podataka
-          - Smanjen broj nepotrebnih mrežnih zahteva
-          - Prilagođen prikaz za Android uređaje
-
-          ## Informacije o verziji
-
-          - Verzija: ${{ github.run_number }}
-          - Platforma: Android
-          - Format: APK
-          - Kanal distribucije: Latest
-
-          ## Instalacija
-
-          1. Preuzmite datoteku **AutoDesk.apk**.
-          2. Otvorite preuzetu datoteku na Android uređaju.
-          3. Po potrebi dozvolite instalaciju iz ovog izvora.
-          4. Instalirajte ili ažurirajte aplikaciju.
-
-          > Za ažuriranje postojeće aplikacije potrebno je da
-          > APK bude potpisan istim digitalnim ključem.
-
-          ---
-
-          **AutoDesk — Digitalno upravljanje auto-servisom.**
-          EOF
-
-          gh release create apk-latest AutoDesk.apk \
-            --title "AutoDesk V2 | Build ${{ github.run_number }}" \
-            --notes-file release-notes.md \
+          gh release view apk-latest >/dev/null 2>&1 || gh release create apk-latest --title "AutoDesk Android" --notes "Signed Android updates" --latest=false
+          gh release upload apk-latest AutoDesk.apk --clobber
+          printf '{"versionCode":%s,"versionName":"1.0.%s"}\n' "$GITHUB_RUN_NUMBER" "$GITHUB_RUN_NUMBER" > android-update.json
+          gh release upload apk-latest android-update.json --clobber

@@ -8,7 +8,8 @@ const fs = require('fs');
 const path = require('path');
 
 const root = path.resolve(__dirname, '..');
-const out = path.join(root, 'www');
+const desktop = process.argv.includes('--desktop');
+const out = path.join(root, desktop ? 'desktop/www' : 'www');
 const UA = 'Mozilla/5.0 (Linux; Android 13; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Mobile Safari/537.36';
 
 fs.rmSync(out, { recursive: true, force: true });
@@ -20,9 +21,10 @@ for (const f of ['index.html', 'manifest.json']) {
 for (const d of ['src', 'config', 'assets/images', 'assets/icons']) {
   fs.cpSync(path.join(root, d), path.join(out, d), { recursive: true });
 }
-// Vehicle catalog remains remotely hosted in Android, as before.
+// Bundle all catalogs for offline fallback.
+fs.writeFileSync(path.join(out,'src/js/update-config.js'), 'globalThis.AUTODESK_REPOSITORY = '+JSON.stringify(process.env.GITHUB_REPOSITORY || '')+';\n');
 fs.mkdirSync(path.join(out, 'data'), { recursive: true });
-for (const f of ['dtc-database.json', 'ecu_database.json']) {
+for (const f of ['dtc-database.json', 'ecu_database.json', 'vehicles-database.json']) {
   fs.copyFileSync(path.join(root, 'data', f), path.join(out, 'data', f));
 }
 
@@ -47,6 +49,7 @@ async function get(url, headers = {}) {
     }
     console.log('Firebase SDK preuzet:', urls.map(m => m[1]).join(', '));
   } catch (e) {
+    if (desktop) throw e;
     console.log('::warning::Firebase SDK nije preuzet lokalno; aplikacija će pri pokretanju zahtevati internet. ' + e.message);
   }
 
@@ -72,6 +75,11 @@ async function get(url, headers = {}) {
     console.log('::warning::Fontovi nisu preuzeti lokalno (koristiće se rezervni fontovi bez interneta). ' + e.message);
   }
 
+  if (desktop) {
+    // Desktop files are bundled; service worker is not needed.
+    const appPath = path.join(out, 'src/js/app.js');
+    fs.writeFileSync(appPath, fs.readFileSync(appPath, 'utf8').replace("if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js').catch(() => {});", ''));
+  }
   fs.writeFileSync(indexPath, html);
   console.log('www/ spreman.');
 })().catch(e => { console.error(e); process.exit(1); });

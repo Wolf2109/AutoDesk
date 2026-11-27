@@ -1158,6 +1158,8 @@ async function settingsPage() {
         `<section class="panel"><h3>Mrežni pristup i čuvanje podataka</h3>` +
         `<p class="subtle">Aplikacija je objavljena na GitHub Pages, a podaci se sinhronizuju preko Firebase Firestore baze. Za sinhronizaciju je potreban internet.</p></section>`;
         
+    window.AutoDeskCatalogs?.mount(document.getElementById('content'));
+    window.AutoDeskUpdates?.mount(document.getElementById('content'));
     $('#settingsForm').onsubmit = async e => {
         e.preventDefault();
         try {

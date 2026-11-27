@@ -235,3 +235,10 @@ Smoke testovi ne zamenjuju proveru na stvarnom Firebase projektu, pregledaču i 
 ## Licenca
 
 Privatni projekat radionice. Sva prava zadržana, osim ako vlasnik ne odluči drugačije. Prava na podatke i komponente trećih strana uređena su njihovim odgovarajućim uslovima.
+
+## Windows
+
+[Uputstvo za Windows build](docs/WINDOWS.md).
+
+### Ručna sinhronizacija referentnih baza
+Android i Windows koriste ugrađene ili poslednje lokalno sačuvane baze vozila, ECU i DTC. U Podešavanjima → Sinhronizacija baza → Sinhronizuj baze ručno se preuzimaju nove kopije. Web verzija mora prvi put preuzeti bazu ako nema lokalne kopije. Automatska provera verzije aplikacije i Firebase sinhronizacija evidencije ostaju nezavisne.

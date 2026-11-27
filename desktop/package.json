@@ -1,0 +1,48 @@
+{
+  "name": "autodesk-desktop",
+  "productName": "AutoDesk",
+  "version": "1.0.0",
+  "private": true,
+  "main": "main.cjs",
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder --win --x64 --publish never"
+  },
+  "devDependencies": {
+    "electron": "^45.0.0",
+    "electron-builder": "^26.0.0"
+  },
+  "build": {
+    "appId": "rs.autodijagnostikalazarevic.autodesk.desktop",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "main.cjs",
+      "server.cjs",
+      "package.json",
+      "www/**/*",
+      "updates.cjs"
+    ],
+    "win": {
+      "icon": "www/assets/icons/icon-512.png",
+      "target": [
+        "nsis",
+        "portable"
+      ]
+    },
+    "nsis": {
+      "artifactName": "AutoDesk-Setup.exe",
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true
+    },
+    "portable": {
+      "artifactName": "AutoDesk-Portable.exe"
+    }
+  },
+  "dependencies": {
+    "electron-updater": "^6.6.2"
+  }
+}

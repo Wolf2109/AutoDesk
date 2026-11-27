@@ -20,3 +20,8 @@ Isti kod kao web verzija, upakovan u pravu Android aplikaciju (Capacitor). APK g
 - Izvoz JSON-a otvara Android „Podeli/Sačuvaj“ (Drive, Fajlovi, WhatsApp…).
 - Aplikacija ima svoje fajlove, Firebase SDK i fontove u APK-u, pa se pokreće i bez interneta.
 - Dugme „Nazad“ zatvara prozor ili meni, pa vraća na prethodni ekran; tek sa početne strane izlazi iz aplikacije.
+
+## Ažuriranje
+Potpisani main build ažurira postojeći apk-latest release (AutoDesk.apk i android-update.json). Instalirana aplikacija proverava versionCode pri pokretanju i jednom na sat; ručna provera je u Podešavanjima. Potvrda otvara APK u sistemskom pregledaču; korisnik zatim otvara preuzetu datoteku i potvrđuje instalaciju. Nema tihe instalacije. Isti applicationId i ključ su obavezni. Privatni GitHub repozitorijumi nisu podržani za anonimno preuzimanje. Nepotpisani build ostaje artifact i ne objavljuje se kao ažuriranje.
+
+Sve tri referentne baze pri prvom otvaranju pretrage u sesiji pokušavaju da učitaju aktuelnu verziju sa postojećeg HTTPS hostinga. Ako mreža ili CORS ne dozvoljavaju pristup, koriste prethodno keširanu ili ugrađenu bazu. Ponovno pokretanje aplikacije osvežava memorijski keš. Ovo ne menja privatnu evidenciju radionice.

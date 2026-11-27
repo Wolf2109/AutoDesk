@@ -1,7 +1,9 @@
 'use strict';
 const VehicleSearch = (() => {
   let pending, outsideMenuController;
+  globalThis.addEventListener?.('autodesk-catalog-sync', () => {pending=null;});
   const load = () => pending ||= (async () => {
+    if(globalThis.loadAutoDeskCatalog) return globalThis.loadAutoDeskCatalog('vehicles-database.json', r=>Array.isArray(r)&&r.length>0&&!!r[0].Brand);
     const url = globalThis.VEHICLE_DATABASE_URL;
     let response;
     try { response = await fetch(url, {credentials:'omit'}); }

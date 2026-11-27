@@ -14,7 +14,9 @@ const EcuSearch = (() => {
     }
     return exact.concat(partial);
   }
+  globalThis.addEventListener?.('autodesk-catalog-sync', () => {pending=null;});
   const load = () => pending ||= (async () => {
+    if(globalThis.loadAutoDeskCatalog) return index(await globalThis.loadAutoDeskCatalog('ecu_database.json',r=>Array.isArray(r)&&r.length>0&&'bosch_number' in r[0]));
     const response = await fetch(new URL('./data/ecu_database.json', document.baseURI), {credentials:'omit'});
     if (!response.ok) throw Error('HTTP ' + response.status);
     const rows = await response.json();

@@ -3,3 +3,6 @@ www/
 android/
 *.keystore
 *.jks
+
+desktop/www/
+desktop/dist/
