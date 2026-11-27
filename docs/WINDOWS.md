@@ -10,3 +10,7 @@ Pre distribucije proveriti prijavu, pretrage, štampanje i offline režim na Win
 
 ## Ažuriranje
 GitHub Actions na main objavljuje Windows release v1.0.<run_number> sa NSIS instalacijom i latest.yml. Instalirana verzija proverava pri pokretanju i jednom na sat; meniju AutoDesk → Proveri ažuriranja. Preuzimanje i restart zahtevaju potvrdu. Portable otvara stranicu release-a. Repozitorijum mora biti javno dostupan; ne ugrađivati token u aplikaciju. Pre distribucije potpisati instalaciju i testirati prelazak sa jedne verzije na drugu. Trenutna konfiguracija objavljuje svaki uspešan main build, ne samo ručno odabrane stabilne verzije.
+
+
+## Fullscreen
+Setup and Portable launch in fullscreen. Press F11 to toggle fullscreen, or Esc to exit fullscreen. Alt+F4 closes the application.
