@@ -1193,3 +1193,5 @@ body::after { background: linear-gradient(90deg, transparent, var(--accent), tra
 
 /* ECU number search – same visual language as vehicle search. */
 .ecu-search-status{margin:18px 0 10px}.ecu-search-host .ecu-more{margin-top:14px;width:100%}.ecu-search-host .ecu-more[hidden]{display:none}.ecu-result-card .vs-details dd{font-variant-numeric:tabular-nums;user-select:text}.ecu-result-card .vs-details>div{min-width:0}
+
+.vs-category-tabs{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin:12px 0}.vs-category-tabs .vs-module-tab{padding:12px 8px;font-size:13px;overflow-wrap:anywhere}.ecu-result-card .vs-details{margin-top:8px}.ecu-result-card .ecu-catalog-list{display:grid;gap:8px}.ecu-result-card .ecu-catalog-list .vs-details{margin:0;padding:8px 0;border-top:1px solid var(--line-strong)}@media(max-width:640px){.vs-category-tabs{grid-template-columns:repeat(2,minmax(0,1fr))}}

@@ -111,6 +111,15 @@ const VehicleSearch = (() => {
   const moduleRows=(rows,type)=>rows.filter(r=>String(r['MCU Type']).trim().toUpperCase()===(type==='ECU'?'ECM':'TCM'));
   const fuelGroup=r=>/diesel|dizel/i.test(String(r.Fuel||''))?'Diesel':'Petrol';
   const searchRows=(rows,query)=>{const terms=query.trim().toLowerCase().split(/\s+/).filter(Boolean);return rows.filter(r=>{const text=['Brand','Model','Version','Engine','Engine type','Ecu maker','Ecu model','Power(PS)','Power(KW)','Fuel','Connection mode','Tool','ProductionStart','ProductionEnd'].map(k=>r[k]??'').join(' ').toLowerCase();return terms.every(t=>text.includes(t));});};
+  const categories=[['cars','Automobili i kombiji'],['trucks','Kamioni i autobusi'],['heavy','Teška mehanizacija'],['other','Ostala vozila']];
+  function vehicleCategory(r){
+    const t=String(r.Type||'').trim().toLowerCase();
+    if(['car','lcv'].includes(t))return 'cars';
+    if(['truck','bus'].includes(t))return 'trucks';
+    if(t==='tractor')return 'heavy';
+    if(t==='other' && !/^(argo|can-am|hisun|kymco|linhai|masai|polaris|segway|ski-doo)$/i.test(String(r.Brand||'').trim()))return 'heavy';
+    return 'other';
+  }
   async function render(){
     const content=document.querySelector('#content'); const host=el('section','panel vs-host');const heading=el('h3','','Pretraga vozila');const info=el('p','subtle','Učitavanje baze vozila…');const filters=el('div','vs-filters');const results=el('div','vs-results');host.append(heading,info,filters,results);content.replaceChildren(host);prepareContentMotion('vehicle-search');
     let rows;
@@ -124,12 +133,16 @@ const VehicleSearch = (() => {
     const tabs=el('div','vs-module-tabs'), search=el('input','vs-result-search'), searchLabel=el('label','vs-search-label','Pretraga ECU / TCM');
     search.type='search';search.id='vs-result-query';searchLabel.htmlFor=search.id;search.placeholder='Model ECU, oznaka motora, marka, model…';
     host.insertBefore(tabs,filters);host.insertBefore(searchLabel,filters);host.insertBefore(search,filters);
-    let type='ECU', brand=null, model=null, version=null, fuel=null, modelWrap,versionWrap;
+    let category='cars', type='ECU', brand=null, model=null, version=null, fuel=null, modelWrap,versionWrap;
+    const categoryTabs=el('div','vs-category-tabs');host.insertBefore(categoryTabs,tabs);
+    const categoryButtons=categories.map(([id,label])=>{const b=el('button','vs-module-tab',label);b.type='button';b.onclick=()=>{if(category===id)return;category=id;brand=model=version=fuel=null;modelWrap=versionWrap=null;filters.replaceChildren();updateCategories();setup();};categoryTabs.append(b);return b;});
+    function updateCategories(){categoryButtons.forEach((b,i)=>{const active=categories[i][0]===category;b.classList.toggle('is-active',active);b.setAttribute('aria-pressed',String(active));});const scoped=rows.filter(r=>vehicleCategory(r)===category);info.textContent=`${unique(scoped,'Brand').length} marki · ${scoped.length.toLocaleString('sr-Latn')} zapisa · ${categories.find(c=>c[0]===category)[1]}`;}
+    updateCategories();
     const buttons=['ECU','TCM'].map(t=>{const b=el('button','vs-module-tab',t);b.type='button';b.onclick=()=>{if(type!==t){type=t;updateModuleTabs();refresh();}};tabs.append(b);return b;});
     function updateModuleTabs(){buttons.forEach((b,i)=>{const active=['ECU','TCM'][i]===type;b.classList.toggle('is-active',active);b.setAttribute('aria-pressed',String(active));});}
     const fuelTabs=el('div','vs-fuel-tabs');fuelTabs.hidden=true;host.insertBefore(fuelTabs,results);
     const fuelButtons=['Diesel','Petrol'].map((f,i)=>{const b=el('button','vs-module-tab vs-fuel-tab',i===0?'Dizel':'Benzin');b.type='button';b.onclick=()=>{fuel=fuel===f?null:f;refresh();};fuelTabs.append(b);return b;});
-    function vehicleRows(){return rows.filter(r=>(brand===null||(r.Brand||'')===brand)&&(model===null||(r.Model||'')===model)&&(version===null||(r.Version||'')===version));}
+    function vehicleRows(){return rows.filter(r=>vehicleCategory(r)===category&&(brand===null||(r.Brand||'')===brand)&&(model===null||(r.Model||'')===model)&&(version===null||(r.Version||'')===version));}
     function refresh(){
       const q=search.value.trim(), complete=version!==null;
       fuelTabs.hidden=!(complete||q);
@@ -180,7 +193,7 @@ const VehicleSearch = (() => {
     function openNext(wrap){wrap.vsOpen();}
     function setup(){
       updateModuleTabs();
-      picker(filters,'Marka',unique(rows,'Brand'),name,b=>{
+      picker(filters,'Marka',unique(vehicleRows(),'Brand'),name,b=>{
         if(brand===b&&modelWrap){openNext(modelWrap);return;}
         brand=b;model=version=null;fuel=null;modelWrap?.remove();versionWrap?.remove();versionWrap=null;
         const br=vehicleRows();
@@ -198,6 +211,6 @@ const VehicleSearch = (() => {
     }
     setup();
   }
-  return {render,unique,period,generationOptions,generationPeriod,groupECU,groupEngines,groupModuleSets,moduleRows,searchRows,fuelGroup};
+  return {render,unique,period,generationOptions,generationPeriod,groupECU,groupEngines,groupModuleSets,moduleRows,searchRows,fuelGroup,vehicleCategory};
 })();
 if(typeof module!=='undefined')module.exports=VehicleSearch;

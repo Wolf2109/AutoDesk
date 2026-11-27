@@ -22,14 +22,33 @@ const EcuSearch = (() => {
     return index(rows);
   })().catch(e => {pending = null; throw e;});
   const el = (tag, cls, text) => {const n = document.createElement(tag); if(cls) n.className=cls; if(text != null)n.textContent=text; return n;};
+  // Keep each Bosch number and ECU designation separate; preserve catalog-to-make links.
+  function groupResults(rows) {
+    const groups=new Map();
+    for(const row of rows){
+      const key=JSON.stringify([normalize(row.bosch_number),String(row.ecu_name??'').replace(/\s+/g,'').toUpperCase()]);
+      if(!groups.has(key))groups.set(key,{...row,catalogs:new Map()});
+      const g=groups.get(key), catalog=present(row.catalog_number)?normalize(row.catalog_number):'';
+      if(!g.catalogs.has(catalog))g.catalogs.set(catalog,{number:row.catalog_number,makes:new Map()});
+      const c=g.catalogs.get(catalog);c.makes.set(String(row.vehicle_make??'').trim().toUpperCase(),row.vehicle_make);
+    }
+    return [...groups.values()];
+  }
   function card(row) {
     const item = el('article','vs-card ecu-result-card');
     item.append(el('h4','',present(row.ecu_name)?row.ecu_name:'Naziv nije naveden'));
     const details=el('dl','vs-details');
-    for(const [label,value] of [['Bosch broj',row.bosch_number],['Kataloški broj',row.catalog_number],['Marka',row.vehicle_make]]) {
-      const block=el('div');block.append(el('dt','',label),el('dd','',present(value)?value:'Nije navedeno'));details.append(block);
+    const block=el('div');block.append(el('dt','','Bosch broj'),el('dd','',present(row.bosch_number)?row.bosch_number:'Nije navedeno'));details.append(block);
+    item.append(details);
+    const list=el('div','ecu-catalog-list');
+    for(const c of row.catalogs.values()){
+      const d=el('dl','vs-details');
+      for(const [label,value] of [['Kataloški broj',c.number],['Marka',[...c.makes.values()].filter(present).join(' / ')]]){
+        const b=el('div');b.append(el('dt','',label),el('dd','',present(value)?value:'Nije navedeno'));d.append(b);
+      }
+      list.append(d);
     }
-    item.append(details);return item;
+    item.append(list);return item;
   }
   async function render() {
     const host=el('section','panel vs-host ecu-search-host'), info=el('p','subtle','Učitavanje baze računara…'), label=el('label','vs-search-label','Kataloški ili Bosch broj'), input=el('input','vs-result-search'), status=el('p','subtle ecu-search-status'), results=el('div','vs-results'), more=el('button','btn ecu-more','Prikaži još');
@@ -41,9 +60,9 @@ const EcuSearch = (() => {
     info.textContent=rows.length.toLocaleString('sr-Latn')+' zapisa · baza računara';input.disabled=false;
     let found=[], shown=0, timer;
     function next(){const fragment=document.createDocumentFragment();for(const row of found.slice(shown,shown+80))fragment.append(card(row));results.append(fragment);shown=Math.min(shown+80,found.length);more.hidden=shown>=found.length;more.textContent=`Prikaži još (${found.length-shown})`;}
-    function refresh(){results.replaceChildren();shown=0;more.hidden=true;const q=normalize(input.value);if(!q){status.textContent='Unesi kataloški ili Bosch broj.';return;}found=search(rows,q);status.textContent=found.length?`${found.length.toLocaleString('sr-Latn')} pronađenih zapisa`:'Nema pronađenih računara.';next();}
+    function refresh(){results.replaceChildren();shown=0;more.hidden=true;const q=normalize(input.value);if(!q){status.textContent='Unesi kataloški ili Bosch broj.';return;}found=groupResults(search(rows,q));status.textContent=found.length?`${found.length.toLocaleString('sr-Latn')} pronađenih računara`:'Nema pronađenih računara.';next();}
     input.addEventListener('input',()=>{clearTimeout(timer);timer=setTimeout(()=>{if(host.isConnected)refresh();},120);});more.onclick=next;refresh();
   }
-  return {render, index, search};
+  return {render, index, search, groupResults};
 })();
 if(typeof module !== 'undefined' && module.exports) module.exports=EcuSearch;
