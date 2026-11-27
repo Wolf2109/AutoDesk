@@ -9,22 +9,22 @@ const path = require('path');
 
 const root = path.resolve(__dirname, '..');
 const out = path.join(root, 'www');
-const SKIP = new Set(['sw.js', 'package.json', 'package-lock.json', 'capacitor.config.json', 'firestore.rules']);
-const EXT = new Set(['.html', '.js', '.css', '.json', '.ico', '.png', '.jpg', '.svg', '.txt']);
 const UA = 'Mozilla/5.0 (Linux; Android 13; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Mobile Safari/537.36';
 
 fs.rmSync(out, { recursive: true, force: true });
 fs.mkdirSync(out, { recursive: true });
 
-for (const f of fs.readdirSync(root, { withFileTypes: true })) {
-  if (f.isFile() && !SKIP.has(f.name) && EXT.has(path.extname(f.name))) fs.copyFileSync(path.join(root, f.name), path.join(out, f.name));
+for (const f of ['index.html', 'manifest.json']) {
+  fs.copyFileSync(path.join(root, f), path.join(out, f));
 }
-for (const d of ['icons', 'slike']) {
-  if (fs.existsSync(path.join(root, d))) fs.cpSync(path.join(root, d), path.join(out, d), { recursive: true });
+for (const d of ['src', 'config', 'assets/images', 'assets/icons']) {
+  fs.cpSync(path.join(root, d), path.join(out, d), { recursive: true });
 }
-
+// Vehicle catalog remains remotely hosted in Android, as before.
 fs.mkdirSync(path.join(out, 'data'), { recursive: true });
-fs.copyFileSync(path.join(root, 'data', 'ecu_database.json'), path.join(out, 'data', 'ecu_database.json'));
+for (const f of ['dtc-database.json', 'ecu_database.json']) {
+  fs.copyFileSync(path.join(root, 'data', f), path.join(out, 'data', f));
+}
 
 async function get(url, headers = {}) {
   const r = await fetch(url, { headers });
@@ -66,7 +66,7 @@ async function get(url, headers = {}) {
       .replace(/<noscript>\s*<link[^>]*fonts\.googleapis[^>]*>\s*<\/noscript>/g, '')
       .replace(/<link[^>]*fonts\.googleapis[^>]*>/g, '')
       .replace(/<link rel="preconnect"[^>]*>\s*/g, '')
-      .replace('<link rel="stylesheet" href="./style.css">', '<link rel="stylesheet" href="./vendor/fonts.css">\n    <link rel="stylesheet" href="./style.css">');
+      .replace('<link rel="stylesheet" href="./src/css/style.css">', '<link rel="stylesheet" href="./vendor/fonts.css">\n    <link rel="stylesheet" href="./src/css/style.css">');
     console.log('Fontovi preuzeti:', i);
   } catch (e) {
     console.log('::warning::Fontovi nisu preuzeti lokalno (koristiće se rezervni fontovi bez interneta). ' + e.message);

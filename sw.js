@@ -1,6 +1,6 @@
 'use strict';
-const CACHE = 'autodesk-ui-20261127-v47-generation-label';
-const FILES = ['./', './index.html', './style.css', './site-theme.css', './motion.css?v=31', './firebase-config.js', './app.js', './dtc.js', './vehicle-search.js', './ecu-search.js', './vehicle-search-config.js', './dtc-database.json', './native-bridge.js', './print-docs.js', './local-api.js', './cloud-sync.js', './private-cache.js', './private-vehicles.js', './fuel.js', './tools.js', './manifest.json', './favicon.ico', './slike/logo.png', './slike/logo-mark.png', './icons/icon-192.png', './icons/icon-512.png'];
+const CACHE = 'autodesk-ui-20261127-v48-organized';
+const FILES = ['./', './index.html', './src/css/style.css', './src/css/site-theme.css', './src/css/motion.css?v=31', './config/firebase-config.js', './src/js/app.js', './src/js/dtc.js', './src/js/vehicle-search.js', './src/js/ecu-search.js', './src/js/vehicle-search-config.js', './data/dtc-database.json', './src/js/native-bridge.js', './src/js/print-docs.js', './src/js/local-api.js', './src/js/cloud-sync.js', './src/js/private-cache.js', './src/js/private-vehicles.js', './src/js/fuel.js', './src/js/tools.js', './manifest.json', './assets/icons/favicon.ico', './assets/images/logo.png', './assets/images/logo-mark.png', './assets/icons/icon-192.png', './assets/icons/icon-512.png'];
 const SDK = 'https://www.gstatic.com/firebasejs/';
 
 self.addEventListener('install', e => e.waitUntil(caches.open(CACHE).then(c => c.addAll(FILES)).then(() => self.skipWaiting())));
@@ -22,7 +22,7 @@ self.addEventListener('fetch', e => {
 
   if (u.origin !== self.location.origin) return;
 
-  // Fajlovi aplikacije (i firebase-config.js, da se prijava i pokretanje rade bez interneta): prvo mreža, a keš kada nema interneta.
+  // Fajlovi aplikacije (i config/firebase-config.js, da se prijava i pokretanje rade bez interneta): prvo mreža, a keš kada nema interneta.
   e.respondWith(fetch(req).then(r => {
     if (r.ok) { const copy = r.clone(); caches.open(CACHE).then(c => c.put(req, copy)); }
     return r;

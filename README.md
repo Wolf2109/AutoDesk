@@ -98,37 +98,24 @@ Ove celine koriste poseban koren Firestore baze i lokalne kopije, nezavisno od e
 
 ```text
 AutoDesk/
-├── index.html                 # Osnovna stranica
-├── app.js                     # Interfejs radionice
-├── style.css                  # Stilovi i komponente
-├── site-theme.css             # Vizuelni identitet
-├── motion.css                 # Animacije i tranzicije
-├── local-api.js               # Poslovna logika i lokalna evidencija
-├── cloud-sync.js              # Firestore i sinhronizacija
-├── private-cache.js           # Lokalni keš privatnih evidencija
-├── private-vehicles.js        # Lična vozila
-├── fuel.js                    # Gorivo
-├── tools.js                   # Alati i licence
-├── vehicle-search.js          # ECU/TCM katalog i pretraga
-├── vehicle-search-config.js   # URL kataloga vozila
-├── data/
-│   └── vehicles-database.json  # Zasebno hostovan katalog
-├── dtc.js                     # DTC pretraga
-├── dtc-database.json          # Lokalna DTC baza
-├── print-docs.js              # Dokumenti za štampu
-├── original-pdf.js            # PDF funkcionalnosti
-├── firebase-config.js         # Firebase konfiguracija
-├── firestore.rules            # Pravila pristupa
-├── firestore.indexes.json     # Podešavanja indeksa
-├── sw.js                      # Service Worker
-├── manifest.json              # PWA manifest
-├── capacitor.config.json      # Android konfiguracija
-├── native-bridge.js           # Android integracije
-├── android-plugin/            # Nativni dodatak za štampu
-├── scripts/                   # Priprema APK i pomoćne skripte
-├── tests/                     # Funkcionalni smoke testovi
-└── .github/workflows/         # Automatska izrada APK-a
+├── index.html, sw.js, manifest.json  # Web / PWA ulaz
+├── src/
+│   ├── js/                          # Interfejs, pretrage, evidencije, sinhronizacija
+│   └── css/                         # Stilovi, tema i animacije
+├── config/                          # Firebase klijentska konfiguracija
+├── data/                            # Aktivne baze vozila, ECU i DTC
+├── assets/                          # Slike, web ikone i Capacitor ikone
+├── docs/                            # Uputstva i tehnička dokumentacija
+├── legacy/                          # Sačuvani stari fajlovi (nisu deo APK-a)
+├── android-plugin/                  # Nativni dodatak za štampu
+├── scripts/                         # Build i import skripte
+├── tests/                           # Smoke testovi
+├── .github/workflows/               # GitHub Actions
+└── package.json, capacitor.config.json, firebase.json,
+    firestore.rules, firestore.indexes.json, CNAME, .gitignore
 ```
+
+Stari fajl `legacy/vehicles-database.json` nije aktivna baza. Za ažuriranja koristite `data/vehicles-database.json`.
 
 ## Lokalno pokretanje
 
@@ -143,10 +130,10 @@ Otvoriti `http://localhost:8080`. Direktno otvaranje `index.html` preko `file://
 ## Firebase podešavanje
 
 1. U Firebase projektu uključiti Authentication (Email/Password) i Cloud Firestore.
-2. Kreirati vlasnički nalog i njegov UID upisati u `firebase-config.js`.
+2. Kreirati vlasnički nalog i njegov UID upisati u `config/firebase-config.js`.
 3. Uneti konfiguraciju Firebase web aplikacije.
 4. Proveriti vlasnički UID u `firestore.rules` i objaviti pravila. Indekse primeniti uz očuvanje postojećih potrebnih indeksa.
-5. Pri nadogradnji postojeće baze slediti [MIGRACIJA-FIRESTORE.md](MIGRACIJA-FIRESTORE.md).
+5. Pri nadogradnji postojeće baze slediti [docs/MIGRACIJA-FIRESTORE.md](docs/MIGRACIJA-FIRESTORE.md).
 
 ## Hosting kataloga vozila
 
@@ -159,7 +146,7 @@ https://app.autodijagnostikalazarevic.rs/data/vehicles-database.json
 ```
 
 - Web verzija učitava relativnu putanju `./data/vehicles-database.json`.
-- Android verzija koristi apsolutni HTTPS URL iz `vehicle-search-config.js`.
+- Android verzija koristi apsolutni HTTPS URL iz `src/js/vehicle-search-config.js`.
 - Pri promeni lokacije baze prilagoditi odgovarajuću putanju u konfiguraciji.
 - Ako je zahtev sa drugog origin-a, hosting mora dozvoliti CORS, uključujući Android origin `https://localhost`. Za javni katalog bez autentifikacije može se koristiti `Access-Control-Allow-Origin: *`.
 - Server mora vratiti validan JSON niz, a ne HTML stranicu ili stranicu za prijavu.
@@ -211,7 +198,7 @@ GitHub Actions workflow **Build Android APK** priprema web fajlove, lokalne SDK 
 - Za nadogradnju koristiti isti identitet aplikacije i ključ za potpisivanje.
 - Android koristi sistemsku štampu/PDF i deljenje fajlova; katalog vozila ostaje na hostingu.
 
-Detalji: [ANDROID.md](ANDROID.md).
+Detalji: [docs/ANDROID.md](docs/ANDROID.md).
 
 ## Testiranje
 
@@ -221,7 +208,7 @@ Iz korena projekta:
 node tests/records-smoke.cjs
 node tests/offline-smoke.cjs
 node tests/dtc-smoke.cjs
-node --check vehicle-search.js
+node --check src/js/vehicle-search.js
 ```
 
 Smoke testovi ne zamenjuju proveru na stvarnom Firebase projektu, pregledaču i Android uređaju. Pre objavljivanja proveriti i ECU/TCM filtere, grupisanje, padajuće menije, format godina, učitavanje baze sa hostinga, povratak mrežne veze i PDF štampu.
@@ -238,11 +225,11 @@ Smoke testovi ne zamenjuju proveru na stvarnom Firebase projektu, pregledaču i 
 ## Dodatna dokumentacija
 
 - [UPUTSTVO.md](UPUTSTVO.md) – postavljanje aplikacije
-- [ANDROID.md](ANDROID.md) – Android verzija
+- [docs/ANDROID.md](docs/ANDROID.md) – Android verzija
 - [VEHICLE-HOSTING.md](VEHICLE-HOSTING.md) – hosting kataloga vozila
-- [DTC-UPUTSTVO.md](DTC-UPUTSTVO.md) – DTC baza
-- [MIGRACIJA-FIRESTORE.md](MIGRACIJA-FIRESTORE.md) – migracija Firestore evidencije
-- [OPTIMIZACIJA-CITANJA.md](OPTIMIZACIJA-CITANJA.md) – optimizacija čitanja
+- [docs/DTC-UPUTSTVO.md](docs/DTC-UPUTSTVO.md) – DTC baza
+- [docs/MIGRACIJA-FIRESTORE.md](docs/MIGRACIJA-FIRESTORE.md) – migracija Firestore evidencije
+- [docs/OPTIMIZACIJA-CITANJA.md](docs/OPTIMIZACIJA-CITANJA.md) – optimizacija čitanja
 - [IZMENE-2026-11-24.md](IZMENE-2026-11-24.md) – prethodne izmene i offline rad
 
 ## Licenca

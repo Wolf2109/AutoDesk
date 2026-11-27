@@ -20,5 +20,5 @@ with tempfile.TemporaryDirectory() as temp:
     total=len(result['generic'])+sum(map(len,result['manufacturers'].values()))
     if total<10000 or len(result['manufacturers'])<10: raise RuntimeError(f'Unexpected incomplete database: {total}')
     (root/'DTC-UPSTREAM-LICENSE.txt').write_bytes((repo/'LICENSE').read_bytes())
-    target=root/'dtc-database.json';tmp=target.with_suffix('.tmp');tmp.write_text(json.dumps(result,ensure_ascii=False,separators=(',',':'))+'\n',encoding='utf-8');tmp.replace(target)
+    target=root/'data/dtc-database.json';tmp=target.with_suffix('.tmp');tmp.write_text(json.dumps(result,ensure_ascii=False,separators=(',',':'))+'\n',encoding='utf-8');tmp.replace(target)
     print(f'{total} definitions; {len(result["manufacturers"])} manufacturers; revision {rev}')

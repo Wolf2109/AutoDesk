@@ -222,7 +222,7 @@ const CloudSync = (() => {
   /* ---------- prijava ---------- */
 
   async function login(email, password) {
-    if (!ready) throw Error('Firebase nije dostupan. Proverite internet vezu i firebase-config.js.');
+    if (!ready) throw Error('Firebase nije dostupan. Proverite internet vezu i config/firebase-config.js.');
     const result = await auth.signInWithEmailAndPassword(email, password);
     if (result.user.uid !== cfg.ownerUid) { await auth.signOut(); throw Error('Ovaj nalog nema pristup.'); }
     return result;

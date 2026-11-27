@@ -1,6 +1,6 @@
 /*
  * AutoDesk – animacije i prelazi.
- * Samo vizuelni sloj: ne menja markup, logiku ni raspored. Učitava se posle style.css.
+ * Samo vizuelni sloj: ne menja markup, logiku ni raspored. Učitava se posle src/css/style.css.
  * Pravilo: kretanje prati radnju korisnika (otvaranje, izbor, potvrda), a ne ukrašava.
  * Jedan zapaženi trenutak: grafikon i trake na početnoj/statistici se iscrtavaju.
  */

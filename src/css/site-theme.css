@@ -326,7 +326,7 @@ tbody tr:hover td { background: rgba(255,186,8,.035); }
     top: 27px; right: 5px;
     width: min(48%, 215px);
     height: 100px;
-    background: url('./slike/logo-mark.png') center / contain no-repeat;
+    background: url('../../assets/images/logo-mark.png') center / contain no-repeat;
     opacity: .075;
     filter: grayscale(1);
     pointer-events: none;

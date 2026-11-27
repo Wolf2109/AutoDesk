@@ -1,6 +1,6 @@
 const assert=require('node:assert/strict');
-const DTC=require('../dtc.js');
-const actual=require('../dtc-database.json');
+const DTC=require('../src/js/dtc.js');
+const actual=require('../data/dtc-database.json');
 const sample={generic:{P0420:'generic'},manufacturers:{FORD:{P1131:'ford'},VOLKSWAGEN:{P1131:'vw'},MERCEDES:{P1131:'mb'}}};
 assert.equal(DTC.lookup(sample,'Ford','p1131').description,'ford');
 assert.equal(DTC.lookup(sample,'VW','P1131').description,'vw');

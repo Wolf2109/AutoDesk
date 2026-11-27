@@ -109,7 +109,7 @@ footer{border-top:1px solid #DDE2EA;margin-top:28px;padding-top:10px;color:#6670
   async function logoData() {
     if (logoCache !== null) return logoCache;
     try {
-      const blob = await (await fetch('./slike/logo.png')).blob();
+      const blob = await (await fetch('./assets/images/logo.png')).blob();
       logoCache = await new Promise((resolve, reject) => { const r = new FileReader(); r.onload = () => resolve(r.result); r.onerror = reject; r.readAsDataURL(blob); });
     } catch { logoCache = ''; }
     return logoCache;
