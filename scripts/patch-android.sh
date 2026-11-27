@@ -7,7 +7,7 @@ echo "Java paket: $JAVA_DIR"
 cp android-plugin/MainActivity.java android-plugin/HtmlPrintPlugin.java android-plugin/AutoDeskUpdatePlugin.java "$JAVA_DIR/"
 
 RUN="${GITHUB_RUN_NUMBER:-1}"
-sed -i -E "s/versionCode [0-9]+/versionCode ${RUN}/; s/versionName \"[^\"]*\"/versionName \"1.0\"/" android/app/build.gradle
+sed -i -E "s/versionCode [0-9]+/versionCode ${RUN}/; s/versionName \"[^\"]*\"/versionName \"1.1.${RUN}\"/" android/app/build.gradle
 
 # Allow user-confirmed APK installation through the system installer.
 sed -i '/<application/i\    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />' android/app/src/main/AndroidManifest.xml

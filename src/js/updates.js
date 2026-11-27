@@ -6,7 +6,7 @@
  if(android){
    cap.Plugins.App.getInfo().then(info=>{
      const label=document.getElementById('appVersion');
-     if(label&&info.version){label.textContent='AutoDesk v'+info.version.replace(/^(\d+\.\d+)\.0$/,'$1');label.hidden=false;}
+     if(label&&info.version){label.textContent='v'+info.version.replace(/^(\d+\.\d+)\.0$/,'$1');label.hidden=false;}
    }).catch(e=>console.warn('App version:',e.message));
  }
  let busy=false,lastPrompt=0;
@@ -16,12 +16,12 @@
  function popup(title,message,buttons=[],progress=false){
    if(!host){host=document.createElement('div');host.style.cssText='position:fixed;inset:0;z-index:2147483647';shadow=host.attachShadow({mode:'open'});document.body.append(host);}
    host.hidden=false;shadow.replaceChildren();
-   const style=document.createElement('style');style.textContent=`.overlay{position:absolute;inset:0;background:#000a;display:grid;place-items:center;padding:18px;font-family:Arial,sans-serif}.panel{box-sizing:border-box;width:min(100%,440px);background:#202124;color:#fff;border:1px solid #444;border-top:3px solid #e3212b;border-radius:12px;padding:24px;box-shadow:0 20px 80px #0009}.brand{color:#ef4444;font-size:11px;font-weight:bold;letter-spacing:.15em}h2{font-size:22px}p{color:#ccc;font-size:14px;line-height:1.5;overflow-wrap:anywhere}progress{width:100%;accent-color:#e3212b;height:14px}.actions{display:flex;justify-content:flex-end;gap:10px;flex-wrap:wrap}button{padding:12px;border-radius:7px;background:#34353a;color:white;border:1px solid #555;font-weight:bold}button:last-child{background:#c91e28}`;
+   const style=document.createElement('style');style.textContent=` :host{font-family:var(--f-body,system-ui,sans-serif)}.overlay{position:absolute;inset:0;display:grid;place-items:center;background:#05070dcc;pointer-events:auto;box-sizing:border-box;padding:max(16px,env(safe-area-inset-top)) max(16px,env(safe-area-inset-right)) max(16px,env(safe-area-inset-bottom)) max(16px,env(safe-area-inset-left));overflow:auto}.panel{box-sizing:border-box;width:min(100%,440px);min-width:0;max-height:100%;overflow:auto;background:var(--card,#0d111b);color:var(--text,#f4f5f7);border:1px solid var(--line-strong,#303541);border-radius:16px;padding:clamp(16px,5vw,26px);box-shadow:0 20px 60px #0009}.brand{font-size:10px;letter-spacing:.15em;color:var(--gold,#ffba08);font-weight:700}h2{font:700 26px/1.1 var(--f-display,system-ui,sans-serif);margin:12px 0;color:inherit}p{font-size:14px;line-height:1.5;color:var(--muted,#9da4b2);overflow-wrap:anywhere}.stats,.actions{display:flex;flex-wrap:wrap;justify-content:space-between;gap:10px;align-items:center}.stats{font-size:13px;margin-top:16px}progress{width:100%;height:12px;accent-color:var(--gold,#ffba08);margin-top:8px}.speed{font-size:12px;margin-top:6px}.actions{justify-content:flex-end;margin-top:18px}button{font:700 14px var(--f-body,system-ui,sans-serif);min-height:44px;padding:10px 15px;border-radius:8px;border:1px solid var(--line-strong,#303541);background:var(--card-hi,#141925);color:var(--text,#f4f5f7);cursor:pointer}button.primary{background:var(--gold,#ffba08);border-color:var(--gold,#ffba08);color:#101015}button:focus-visible{outline:2px solid var(--gold,#ffba08);outline-offset:3px}@media(max-width:420px){.actions{display:grid;grid-template-columns:1fr;width:100%}.actions:empty{display:none}button{width:100%}}`;
    const overlay=document.createElement('div'),panel=document.createElement('section');overlay.className='overlay';panel.className='panel';panel.setAttribute('role','dialog');panel.setAttribute('aria-modal','true');panel.setAttribute('aria-label',title);
    const add=(tag,text,cls)=>{const e=document.createElement(tag);e.textContent=text;if(cls)e.className=cls;panel.append(e);return e;};
-   add('div','AUTODESK / UPDATE','brand');add('h2',title);add('p',message);
+   add('div','AUTODESK / AŽURIRANJE','brand');add('h2',title);add('p',message);
    if(progress){const stats=add('p','Priprema preuzimanja…');stats.id='stats';const bar=add('progress','');bar.max=100;bar.id='bar';}
-   const actions=add('div','','actions');for(const [label,fn] of buttons){const b=document.createElement('button');b.textContent=label;b.onclick=fn;actions.append(b);}
+   const actions=add('div','','actions');for(const [i,[label,fn]] of buttons.entries()){const b=document.createElement('button');b.textContent=label;if(i===buttons.length-1)b.className='primary';b.onclick=fn;actions.append(b);}
    overlay.append(panel);shadow.append(style,overlay);
  }
  const close=()=>{if(host)host.hidden=true;};
