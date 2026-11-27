@@ -3,6 +3,27 @@ name: Build Android APK
 on:
   push:
     branches: [main]
+    paths:
+      - 'index.html'
+      - 'manifest.json'
+      - 'src/**'
+      - 'config/**'
+      - 'assets/images/**'
+      - 'assets/icons/**'
+      - 'data/dtc-database.json'
+      - 'data/ecu_database.json'
+      - 'data/vehicles-database.json'
+      - 'scripts/prepare-www.js'
+      - 'android-plugin/**'
+      - 'android/**'
+      - 'capacitor.config.json'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'scripts/patch-android.sh'
+      - 'assets/icon-background.png'
+      - 'assets/icon-foreground.png'
+      - 'assets/icon-only.png'
+      - '.github/workflows/build-apk.yml'
   workflow_dispatch:
 
 permissions:

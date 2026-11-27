@@ -17,7 +17,8 @@ else {
       wc.on('will-attach-webview',e=>e.preventDefault());
       wc.setWindowOpenHandler(({url})=>url==='about:blank'?{action:'allow',overrideBrowserWindowOptions:{webPreferences:prefs,autoHideMenuBar:true}}:{action:'deny'});
     });
-    win=new BrowserWindow({width:1280,height:850,fullscreen:true,minWidth:360,minHeight:540,backgroundColor:'#111214',autoHideMenuBar:true,icon:path.join(__dirname,'www/assets/icons/icon-512.png'),webPreferences:prefs});
+    win=new BrowserWindow({width:1280,height:850,fullscreen:false,minWidth:360,minHeight:540,backgroundColor:'#111214',autoHideMenuBar:true,icon:path.join(__dirname,'www/assets/icons/icon-512.png'),webPreferences:prefs});
+    win.maximize();
     win.setMenuBarVisibility(false);
     win.webContents.on('before-input-event',(event,input)=>{
       if(input.type!=='keyDown'||input.isAutoRepeat)return;
@@ -25,6 +26,9 @@ else {
         event.preventDefault();
         win.setFullScreen(input.key==='F11'?!win.isFullScreen():false);
       }
+    });
+    win.webContents.on('did-finish-load',()=>{
+      win.webContents.insertCSS('* { scrollbar-width: none !important; } *::-webkit-scrollbar { display: none !important; }').catch(e=>console.warn('Scrollbar CSS:',e.message));
     });
     await win.loadURL(origin+'/');
     setupUpdates(win);
