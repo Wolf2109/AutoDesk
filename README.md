@@ -46,7 +46,7 @@ Katalog sadrži **20.057 zapisa** iz različitih kategorija vozila. Godine gener
 | Poznat samo početak ili označena tekuća proizvodnja | `2012 - →` |
 | Poznat samo kraj | `→ - 2020` |
 | Ista početna i završna godina | `2015` |
-| Obe godine nedostaju | Godine nisu proverene |
+| Obe godine nedostaju | Samo naziv generacije |
 
 Strelica na kraju ne mora značiti da se vozilo još proizvodi: može označavati i nepoznatu završnu godinu. Katalog služi za informativni pregled podrške; podatke treba proveriti prema konkretnoj konfiguraciji vozila i dokumentaciji proizvođača.
 

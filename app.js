@@ -149,6 +149,7 @@ const navItems = [
     ['clients', '<svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0116 0"/></svg>', 'Klijenti'],
     ['vehicles', '<svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 16l1.5-5.5A2 2 0 018.4 9h7.2a2 2 0 011.9 1.5L19 16"/><rect x="3" y="16" width="18" height="4" rx="1.5"/></svg>', 'Vozila'],
     ['vehicle-search', '<svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="10" cy="10" r="6"/><path d="m14.5 14.5 6 6"/></svg>', 'Pretraga vozila'],
+    ['ecu-search', '<svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="5" y="5" width="14" height="14" rx="2"/><rect x="9" y="9" width="6" height="6"/><path d="M9 2v3m6-3v3M9 19v3m6-3v3M2 9h3m-3 6h3m14-6h3m-3 6h3"/></svg>', 'Pretraga računara'],
     ['services', '<svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16M4 12h16M4 18h10"/></svg>', 'Cenovnik'],
     ['stats', '<svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>', 'Statistika'],
     ['private', '<svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 13l2-5.5A2 2 0 016.9 6h10.2A2 2 0 0119 7.5L21 13"/><path d="M3 13h18v5a1 1 0 01-1 1h-2v-2H6v2H4a1 1 0 01-1-1z"/><circle cx="7.5" cy="15.5" r=".6"/><circle cx="16.5" cy="15.5" r=".6"/></svg>', 'Lična vozila'],
@@ -255,18 +256,18 @@ async function navigate(page, keep = false, fromPop = false) {
     $('#pageTitle').textContent = navItems.find(x => x[0] === page)?.[2] || 'AutoDesk';
     const headSmall = document.querySelector('header small');
     if (headSmall) headSmall.textContent = (page === 'private' || page === 'fuel') ? 'Privatno' : 'Radionica';
-    $('#quickOrder')?.classList.toggle('hidden', page === 'private' || page === 'fuel' || page === 'tools' || page === 'vehicle-search');
+    $('#quickOrder')?.classList.toggle('hidden', page === 'private' || page === 'fuel' || page === 'tools' || page === 'vehicle-search' || page === 'ecu-search');
 
     // Prazna ili druga stranica: prikaži učitavanje; ista stranica ostaje vidljiva uz traku na vrhu.
     const content = $('#content');
     if (state.renderedPage !== page || !content.firstElementChild) content.innerHTML = loaderHtml();
-    if (!['fuel', 'orders', 'stats', 'private', 'tools', 'vehicle-search'].includes(page)) prepareContentMotion(page);
+    if (!['fuel', 'orders', 'stats', 'private', 'tools', 'vehicle-search', 'ecu-search'].includes(page)) prepareContentMotion(page);
     document.body.classList.add('busy');
 
     try {
         // Lična vozila su zasebna celina: ne učitavaju podatke radionice i ne zavise od njih.
-        if (page === 'vehicle-search') {
-            await VehicleSearch.render();
+        if (page === 'vehicle-search' || page === 'ecu-search') {
+            await (page === 'ecu-search' ? EcuSearch : VehicleSearch).render();
             if (seq === navSeq) state.renderedPage = page;
             return;
         }

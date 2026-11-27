@@ -23,6 +23,9 @@ for (const d of ['icons', 'slike']) {
   if (fs.existsSync(path.join(root, d))) fs.cpSync(path.join(root, d), path.join(out, d), { recursive: true });
 }
 
+fs.mkdirSync(path.join(out, 'data'), { recursive: true });
+fs.copyFileSync(path.join(root, 'data', 'ecu_database.json'), path.join(out, 'data', 'ecu_database.json'));
+
 async function get(url, headers = {}) {
   const r = await fetch(url, { headers });
   if (!r.ok) throw new Error(url + ' -> ' + r.status);

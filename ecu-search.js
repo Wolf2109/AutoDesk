@@ -1,0 +1,49 @@
+'use strict';
+const EcuSearch = (() => {
+  let pending;
+  const normalize = v => String(v ?? '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+  const present = v => v && !/^(UNKNOWN|N\/A|-+)$/i.test(String(v).trim());
+  const index = rows => rows.map(row => ({row, catalog: present(row.catalog_number) ? normalize(row.catalog_number) : '', bosch: present(row.bosch_number) ? normalize(row.bosch_number) : ''}));
+  function search(rows, query) {
+    const q = normalize(query);
+    if (!q) return [];
+    const exact = [], partial = [];
+    for (const r of rows) {
+      if (r.catalog === q || r.bosch === q) exact.push(r.row);
+      else if (r.catalog.includes(q) || r.bosch.includes(q)) partial.push(r.row);
+    }
+    return exact.concat(partial);
+  }
+  const load = () => pending ||= (async () => {
+    const response = await fetch(new URL('./data/ecu_database.json', document.baseURI), {credentials:'omit'});
+    if (!response.ok) throw Error('HTTP ' + response.status);
+    const rows = await response.json();
+    if (!Array.isArray(rows) || !rows.length || !('bosch_number' in rows[0])) throw Error('Neispravan format baze');
+    return index(rows);
+  })().catch(e => {pending = null; throw e;});
+  const el = (tag, cls, text) => {const n = document.createElement(tag); if(cls) n.className=cls; if(text != null)n.textContent=text; return n;};
+  function card(row) {
+    const item = el('article','vs-card ecu-result-card');
+    item.append(el('h4','',present(row.ecu_name)?row.ecu_name:'Naziv nije naveden'));
+    const details=el('dl','vs-details');
+    for(const [label,value] of [['Bosch broj',row.bosch_number],['Kataloški broj',row.catalog_number],['Marka',row.vehicle_make]]) {
+      const block=el('div');block.append(el('dt','',label),el('dd','',present(value)?value:'Nije navedeno'));details.append(block);
+    }
+    item.append(details);return item;
+  }
+  async function render() {
+    const host=el('section','panel vs-host ecu-search-host'), info=el('p','subtle','Učitavanje baze računara…'), label=el('label','vs-search-label','Kataloški ili Bosch broj'), input=el('input','vs-result-search'), status=el('p','subtle ecu-search-status'), results=el('div','vs-results'), more=el('button','btn ecu-more','Prikaži još');
+    input.type='search';input.id='ecu-number-query';label.htmlFor=input.id;input.placeholder='Npr. 0281010001 ili 038 906 018 FB';input.autocomplete='off';input.spellcheck=false;input.disabled=true;status.setAttribute('role','status');more.type='button';more.hidden=true;
+    host.append(el('h3','','Pretraga računara'),info,label,input,status,results,more);document.querySelector('#content').replaceChildren(host);prepareContentMotion('ecu-search');
+    let rows;
+    try {rows=await load();} catch(e){if(!host.isConnected)return;info.textContent='Baza računara nije dostupna. '+e.message;const retry=el('button','btn','Pokušaj ponovo');retry.onclick=()=>{if(host.isConnected)render();};host.append(retry);return;}
+    if(!host.isConnected)return;
+    info.textContent=rows.length.toLocaleString('sr-Latn')+' zapisa · baza računara';input.disabled=false;
+    let found=[], shown=0, timer;
+    function next(){const fragment=document.createDocumentFragment();for(const row of found.slice(shown,shown+80))fragment.append(card(row));results.append(fragment);shown=Math.min(shown+80,found.length);more.hidden=shown>=found.length;more.textContent=`Prikaži još (${found.length-shown})`;}
+    function refresh(){results.replaceChildren();shown=0;more.hidden=true;const q=normalize(input.value);if(!q){status.textContent='Unesi kataloški ili Bosch broj.';return;}found=search(rows,q);status.textContent=found.length?`${found.length.toLocaleString('sr-Latn')} pronađenih zapisa`:'Nema pronađenih računara.';next();}
+    input.addEventListener('input',()=>{clearTimeout(timer);timer=setTimeout(()=>{if(host.isConnected)refresh();},120);});more.onclick=next;refresh();
+  }
+  return {render, index, search};
+})();
+if(typeof module !== 'undefined' && module.exports) module.exports=EcuSearch;

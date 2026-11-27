@@ -1173,3 +1173,23 @@ body::after { background: linear-gradient(90deg, transparent, var(--accent), tra
 @media(max-width:760px){.vs-host .vs-filters{grid-template-columns:1fr;gap:12px}.vs-host .vs-input input,.vs-host .vs-result-search{font-size:16px}.vs-host .vs-option{min-height:46px;font-size:14px}}
 @media(prefers-reduced-motion:no-preference){.vs-host .vs-options:not([hidden]){animation:vsMenuOpen .16s cubic-bezier(.2,.75,.25,1) both}.vs-host .vs-picker:not(:first-child) .vs-input{animation:vsFieldIn .18s ease-out both}@keyframes vsMenuOpen{from{transform:scaleY(.96) translateY(-3px)}to{transform:scaleY(1) translateY(0)}}@keyframes vsFieldIn{from{transform:translateY(3px)}to{transform:translateY(0)}}}
 @media(prefers-reduced-motion:reduce){.vs-host *{transition:none!important;animation:none!important}}
+
+/* Vehicle search: independent fuel tabs and stable, opacity-only entry animation.
+   No transform on the picker itself: the dropdown keeps its stacking and position. */
+.vs-host .vs-fuel-tabs{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:0 0 18px}
+.vs-host .vs-fuel-tabs[hidden]{display:none}
+.vs-host .vs-fuel-tab{padding:12px;font-size:1.05rem}
+@media(prefers-reduced-motion:no-preference){
+  .vs-host .vs-picker:not(:first-child) .vs-input{animation:none}
+  .vs-host .vs-picker:not(:first-child){animation:vsPickerIn .20s ease-out backwards!important}
+  .vs-host .vs-options:not([hidden]){animation:vsDropdownIn .16s ease-out both}
+  @keyframes vsPickerIn{from{opacity:0}to{opacity:1}}
+  @keyframes vsDropdownIn{from{opacity:0}to{opacity:1}}
+}
+/* Engine-first result cards; module details remain available on demand. */
+.vs-engine-card-head{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}.vs-host .vs-engine-card-head h4{margin:0}.vs-power-pill{color:var(--text);background:var(--accent-soft);border:1px solid var(--line-strong);padding:5px 10px;font-size:13px;font-weight:700;white-space:normal}.vs-engine-meta{margin-top:12px}.vs-vehicle-context{margin:6px 0 0}.vs-module-list{display:flex;flex-wrap:wrap;gap:8px}.vs-module-entry{min-width:0;max-width:100%;border:1px solid var(--line-strong);background:var(--card);flex:0 1 auto}.vs-module-entry[open]{flex:1 1 100%}.vs-module-summary{padding:9px 12px;cursor:pointer;overflow-wrap:anywhere;font-size:13px}.vs-module-summary span{margin-right:6px}.vs-module-summary .vs-module-model{color:#ef4444}.vs-module-body{padding:12px;border-top:1px solid var(--line)}.vs-module-body .vs-details+.vs-details{margin-top:10px;padding-top:10px;border-top:1px solid var(--line)}@media(max-width:600px){.vs-module-entry{flex:1 1 100%}.vs-engine-card{padding:12px}.vs-engine-meta{grid-template-columns:1fr 1fr}.vs-engine-card-head{align-items:flex-start}}
+
+.vs-variant-line{padding:12px 0;border-bottom:1px solid var(--line);min-width:0}.vs-variant-line strong{overflow-wrap:anywhere}.vs-variant-line .vs-engine-meta{margin-top:8px}
+
+/* ECU number search – same visual language as vehicle search. */
+.ecu-search-status{margin:18px 0 10px}.ecu-search-host .ecu-more{margin-top:14px;width:100%}.ecu-search-host .ecu-more[hidden]{display:none}.ecu-result-card .vs-details dd{font-variant-numeric:tabular-nums;user-select:text}.ecu-result-card .vs-details>div{min-width:0}
