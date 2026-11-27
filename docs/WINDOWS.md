@@ -9,7 +9,7 @@ Sve tri baze se pakuju lokalno; Firebase SDK se preuzima tokom builda. Prijava i
 Pre distribucije proveriti prijavu, pretrage, štampanje i offline režim na Windows računaru. Ako Firebase odbije origin, proveriti postavke projekta i ograničenja API ključa; ne menjati Firestore pravila radi zaobilaženja autentifikacije.
 
 ## Ažuriranje
-GitHub Actions na main objavljuje Windows release v1.0.<run_number> sa NSIS instalacijom i latest.yml. Instalirana verzija proverava pri pokretanju i jednom na sat; meniju AutoDesk → Proveri ažuriranja. Preuzimanje i restart zahtevaju potvrdu. Portable otvara stranicu release-a. Repozitorijum mora biti javno dostupan; ne ugrađivati token u aplikaciju. Pre distribucije potpisati instalaciju i testirati prelazak sa jedne verzije na drugu. Trenutna konfiguracija objavljuje svaki uspešan main build, ne samo ručno odabrane stabilne verzije.
+GitHub Actions na main objavljuje Windows release v1.0.0 sa NSIS instalacijom i latest.yml. Instalirana verzija proverava pri pokretanju i jednom na sat; meniju AutoDesk → Proveri ažuriranja. Preuzimanje i restart zahtevaju potvrdu. Portable otvara stranicu release-a. Repozitorijum mora biti javno dostupan; ne ugrađivati token u aplikaciju. Pre distribucije potpisati instalaciju i testirati prelazak sa jedne verzije na drugu. Za buduće ažuriranje potrebno je povećati verziju u desktop/package.json i oznaku release-a u workflow-u. Starije razvojne verzije sa višim brojem zahtevaju ručnu instalaciju finalne verzije.
 
 
 ## Fullscreen

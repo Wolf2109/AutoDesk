@@ -22,7 +22,8 @@
       "server.cjs",
       "package.json",
       "www/**/*",
-      "updates.cjs"
+      "updates.cjs",
+      "update-preload.cjs"
     ],
     "win": {
       "icon": "www/assets/icons/icon-512.png",

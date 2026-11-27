@@ -1,5 +1,5 @@
 'use strict';
-const {app,BrowserWindow,dialog,session}=require('electron');
+const {app,BrowserWindow,dialog,session,ipcMain}=require('electron');
 const path=require('node:path');
 const {setupUpdates}=require('./updates.cjs');
 const {start}=require('./server.cjs');
@@ -17,7 +17,11 @@ else {
       wc.on('will-attach-webview',e=>e.preventDefault());
       wc.setWindowOpenHandler(({url})=>url==='about:blank'?{action:'allow',overrideBrowserWindowOptions:{webPreferences:prefs,autoHideMenuBar:true}}:{action:'deny'});
     });
-    win=new BrowserWindow({width:1280,height:850,fullscreen:false,minWidth:360,minHeight:540,backgroundColor:'#111214',autoHideMenuBar:true,icon:path.join(__dirname,'www/assets/icons/icon-512.png'),webPreferences:prefs});
+    win=new BrowserWindow({width:1280,height:850,fullscreen:false,minWidth:360,minHeight:540,backgroundColor:'#111214',autoHideMenuBar:true,icon:path.join(__dirname,'www/assets/icons/icon-512.png'),webPreferences:{...prefs,preload:path.join(__dirname,'update-preload.cjs')}});
+    ipcMain.handle('app:version', event=>{
+      if(event.sender!==win.webContents || event.senderFrame!==win.webContents.mainFrame) return null;
+      return app.getVersion();
+    });
     win.maximize();
     win.setMenuBarVisibility(false);
     win.webContents.on('before-input-event',(event,input)=>{

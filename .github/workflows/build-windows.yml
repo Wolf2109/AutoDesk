@@ -36,7 +36,7 @@ jobs:
         working-directory: desktop
         shell: bash
         run: |
-          npm version "1.0.${GITHUB_RUN_NUMBER}" --no-git-tag-version
+          npm version 1.0.0 --no-git-tag-version --allow-same-version
           node -e 'const fs=require("fs"), p=require("./package.json"); const [owner,repo]=process.env.GITHUB_REPOSITORY.split("/"); p.build.publish=[{provider:"github",owner,repo}]; fs.writeFileSync("package.json",JSON.stringify(p,null,2));'
       - name: Install desktop dependencies
         working-directory: desktop
@@ -63,7 +63,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          tag="v1.0.${GITHUB_RUN_NUMBER}"
+          tag="v1.0.0"
           gh release view "$tag" >/dev/null 2>&1 || gh release create "$tag" --target "$GITHUB_SHA" --title "AutoDesk Windows $tag" --notes "Windows update $tag" --draft
           gh release upload "$tag" desktop/dist/AutoDesk-Setup.exe desktop/dist/AutoDesk-Portable.exe desktop/dist/AutoDesk-Setup.exe.blockmap desktop/dist/latest.yml --clobber
           gh release edit "$tag" --draft=false --latest

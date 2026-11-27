@@ -107,5 +107,5 @@ jobs:
         run: |
           gh release view apk-latest >/dev/null 2>&1 || gh release create apk-latest --title "AutoDesk Android" --notes "Signed Android updates" --latest=false
           gh release upload apk-latest AutoDesk.apk --clobber
-          printf '{"versionCode":%s,"versionName":"1.0.%s"}\n' "$GITHUB_RUN_NUMBER" "$GITHUB_RUN_NUMBER" > android-update.json
+          printf '{"versionCode":%s,"versionName":"1.0"}\n' "$GITHUB_RUN_NUMBER" > android-update.json
           gh release upload apk-latest android-update.json --clobber
