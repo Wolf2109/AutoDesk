@@ -7,3 +7,6 @@ ZIP sadrži lokalni JSON konvertovan iz dostavljene SQLite baze, sa engleskim op
 
 ## Testiranje
 `node tests/dtc-smoke.cjs` proverava OEM prioritete, marke, generički fallback, pretragu i više kodova. Postojeći records/offline smoke testovi takođe prolaze. Nije izvršen end-to-end test na Android uređaju, stvarnoj Firebase bazi niti sa punim upstream skupom.
+
+## Osvežavanje baze
+DTC baza ostaje običan JSON bez dodatnog ključa. U Podešavanjima → Sinhronizacija baza moguće je ručno preuzeti novu kopiju; prethodna kopija ostaje ako osvežavanje ne uspe.

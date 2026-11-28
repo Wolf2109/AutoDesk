@@ -68,3 +68,9 @@ jobs:
           gh release view "$tag" >/dev/null 2>&1 || gh release create "$tag" --target "$GITHUB_SHA" --title "AutoDesk Windows $tag" --notes "Windows update $tag" --draft
           gh release upload "$tag" desktop/dist/AutoDesk-Setup.exe desktop/dist/AutoDesk-Portable.exe desktop/dist/AutoDesk-Setup.exe.blockmap desktop/dist/latest.yml --clobber
           gh release edit "$tag" --draft=false --latest
+          # Remove only older Windows releases, after successful publication. Keep Android and unrelated releases.
+          gh release list --limit 1000 --json tagName,isDraft,isPrerelease --jq '.[] | select(.isDraft == false and .isPrerelease == false) | .tagName' | while IFS= read -r old; do
+            if [[ "$old" =~ ^v1\.1\.([0-9]+)$ ]] && (( 10#${BASH_REMATCH[1]} < GITHUB_RUN_NUMBER )); then
+              gh release delete "$old" --yes
+            fi
+          done

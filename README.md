@@ -132,31 +132,14 @@ Otvoriti `http://localhost:8080`. Direktno otvaranje `index.html` preko `file://
 1. U Firebase projektu uključiti Authentication (Email/Password) i Cloud Firestore.
 2. Kreirati vlasnički nalog i njegov UID upisati u `config/firebase-config.js`.
 3. Uneti konfiguraciju Firebase web aplikacije.
-4. Proveriti vlasnički UID u `firestore.rules` i objaviti pravila. Indekse primeniti uz očuvanje postojećih potrebnih indeksa.
+4. Proveriti vlasnički UID i postojeća pravila u Firebase konzoli (ZIP ne sadrži `firestore.rules`). Indekse primeniti uz očuvanje postojećih potrebnih indeksa.
 5. Pri nadogradnji postojeće baze slediti [docs/MIGRACIJA-FIRESTORE.md](docs/MIGRACIJA-FIRESTORE.md).
 
-## Hosting kataloga vozila
+## Hosting referentnih baza
 
-**Katalog vozila ne ide u Firebase niti u Android APK.** Objavljuje se kao statički JSON na HTTPS hostingu.
+Baze `data/vehicles-database.json`, `data/ecu_database.json` i `data/dtc-database.json` su javni JSON katalozi, bez enkripcije i dodatnog ključa. Android i Windows uključuju sve tri baze za offline korišćenje; web ih preuzima pri prvom korišćenju. Pretraga koristi lokalnu kopiju. U Podešavanjima → Sinhronizacija baza → Sinhronizuj baze moguće je ručno preuzeti nove kopije sa HTTPS hostinga. Neuspešno osvežavanje zadržava prethodnu kopiju. Za drugi origin hosting mora dozvoliti CORS. Privatna evidencija ostaje odvojena i koristi Firebase autentifikaciju i pravila.
 
-Podrazumevana lokacija:
-
-```text
-https://app.autodijagnostikalazarevic.rs/data/vehicles-database.json
-```
-
-- Web verzija učitava relativnu putanju `./data/vehicles-database.json`.
-- Android verzija koristi apsolutni HTTPS URL iz `src/js/vehicle-search-config.js`.
-- Pri promeni lokacije baze prilagoditi odgovarajuću putanju u konfiguraciji.
-- Ako je zahtev sa drugog origin-a, hosting mora dozvoliti CORS, uključujući Android origin `https://localhost`. Za javni katalog bez autentifikacije može se koristiti `Access-Control-Allow-Origin: *`.
-- Server mora vratiti validan JSON niz, a ne HTML stranicu ili stranicu za prijavu.
-- Katalog se učitava pri prvom otvaranju pretrage i čuva u memoriji tokom sesije. Web Service Worker može keširati uspešan zahtev sa istog domena; dostupnost offline nije garantovana na Androidu.
-- JSON nije deo obaveznog PWA prekeširanja niti se kopira u Android `www` paket. DTC baza je, nasuprot tome, deo aplikacije.
-- Zamena JSON fajla na istoj adresi ne zahteva novu izradu APK-a. Ponovno pokretanje aplikacije uz mrežnu vezu omogućava učitavanje nove baze.
-
-Ako se pojavi poruka **Baza vozila nije dostupna**, proveriti direktan URL, HTTP status, CORS i JSON format, pa koristiti dugme **Pokušaj ponovo**.
-
-Detalji: [VEHICLE-HOSTING.md](VEHICLE-HOSTING.md).
+Direktan URL javnog kataloga omogućava preuzimanje sadržaja. Ne objavljivati privatne podatke u ovim fajlovima.
 
 ## Čuvanje podataka i offline rad
 
@@ -184,7 +167,7 @@ Detalji: [VEHICLE-HOSTING.md](VEHICLE-HOSTING.md).
 1. Sačuvati rezervnu kopiju postojeće evidencije i završiti sinhronizaciju na uređajima.
 2. Objaviti projekat u GitHub repozitorijumu, na grani `main`.
 3. U Settings → Pages podesiti objavljivanje iz korenskog foldera grane `main`.
-4. Zadržati `CNAME` za postojeći domen i objaviti `data/vehicles-database.json` na predviđenoj lokaciji statičkog hostinga.
+4. Zadržati `CNAME` za postojeći domen i objaviti sve tri aktivne JSON baze u `data/` na predviđenoj lokaciji statičkog hostinga.
 5. Proveriti prijavu, dostupnost JSON-a, pretragu i Service Worker. Zatvoriti stare kartice aplikacije i ponovo otvoriti novu verziju.
 
 ## Android APK
@@ -196,7 +179,7 @@ GitHub Actions workflow **Build Android APK** priprema web fajlove, lokalne SDK 
 - Pokrenuti workflow preko Actions → Build Android APK → Run workflow ili objaviti izmene na `main`.
 - APK je predviđen za objavljivanje u Releases (`apk-latest`) i među artefaktima izvršenja.
 - Za nadogradnju koristiti isti identitet aplikacije i ključ za potpisivanje.
-- Android koristi sistemsku štampu/PDF i deljenje fajlova; katalog vozila ostaje na hostingu.
+- Android koristi sistemsku štampu/PDF i deljenje fajlova; sve tri baze su ugrađene u APK i mogu se ručno osvežiti.
 
 Detalji: [docs/ANDROID.md](docs/ANDROID.md).
 
@@ -208,6 +191,9 @@ Iz korena projekta:
 node tests/records-smoke.cjs
 node tests/offline-smoke.cjs
 node tests/dtc-smoke.cjs
+node tests/vehicle-catalog-smoke.cjs
+node tests/catalog-smoke.cjs
+node --test tests/desktop-smoke.cjs
 node --check src/js/vehicle-search.js
 ```
 
@@ -224,13 +210,11 @@ Smoke testovi ne zamenjuju proveru na stvarnom Firebase projektu, pregledaču i 
 
 ## Dodatna dokumentacija
 
-- [UPUTSTVO.md](UPUTSTVO.md) – postavljanje aplikacije
 - [docs/ANDROID.md](docs/ANDROID.md) – Android verzija
-- [VEHICLE-HOSTING.md](VEHICLE-HOSTING.md) – hosting kataloga vozila
 - [docs/DTC-UPUTSTVO.md](docs/DTC-UPUTSTVO.md) – DTC baza
 - [docs/MIGRACIJA-FIRESTORE.md](docs/MIGRACIJA-FIRESTORE.md) – migracija Firestore evidencije
 - [docs/OPTIMIZACIJA-CITANJA.md](docs/OPTIMIZACIJA-CITANJA.md) – optimizacija čitanja
-- [IZMENE-2026-11-24.md](IZMENE-2026-11-24.md) – prethodne izmene i offline rad
+- [docs/WINDOWS.md](docs/WINDOWS.md) – Windows verzija
 
 ## Licenca
 
@@ -242,3 +226,6 @@ Privatni projekat radionice. Sva prava zadržana, osim ako vlasnik ne odluči dr
 
 ### Ručna sinhronizacija referentnih baza
 Android i Windows koriste ugrađene ili poslednje lokalno sačuvane baze vozila, ECU i DTC. U Podešavanjima → Sinhronizacija baza → Sinhronizuj baze ručno se preuzimaju nove kopije. Web verzija mora prvi put preuzeti bazu ako nema lokalne kopije. Automatska provera verzije aplikacije i Firebase sinhronizacija evidencije ostaju nezavisne.
+
+### Izmene 28.11.2026.
+Polja za pretragu koriste boje padajućih menija vozila u svetloj i tamnoj temi. Nakon uspešne objave novog stabilnog Windows izdanja brišu se stariji stabilni Windows Releases `v1.1.N`; Android `apk-latest` zamenjuje prethodni APK i metapodatke. Git tagovi, razvojna izdanja i Actions artefakti ostaju.

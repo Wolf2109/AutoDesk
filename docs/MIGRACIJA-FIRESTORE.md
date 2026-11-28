@@ -17,3 +17,6 @@ Migracija je automatska pri prvom online getMeta: čita stari JSON, upisuje poje
 
 ## Testiranje
 node tests/records-smoke.cjs i node tests/offline-smoke.cjs iz korena projekta. Prvi koristi simulirani Firestore (ne emulator), drugi simuliranu lokalnu bazu. Nije izvršeno na pravom Firebase projektu, browseru ili Android uređaju; pravila i indeksi nisu objavljeni. Testirati i stvarne podatke, konkurentne uređaje, uvoz, brisanje i povratak iz offline režima pre redovnog korišćenja.
+
+## Napomena – 28.11.2026.
+Javni JSON katalozi vozila, ECU i DTC odvojeni su od privatne Firestore evidencije. Nije potrebna nova migracija niti dodatni ključ. Postojeća Firebase pravila ostaju nepromenjena; proveriti ih u konzoli jer ZIP ne sadrži `firestore.rules`.

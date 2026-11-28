@@ -12,3 +12,6 @@ Simulacija 500 zapisa: validan lokalni keš + ista verzija = 1 čitanje; izmena 
 
 ## Instalacija
 Zameniti postojeće fajlove projekta novim iz ZIP-a, bez brisanja lokalnih podataka pregledača ili aplikacije. Za Android izgraditi novi APK po postojećem postupku. Ne treba ponovo migrirati Firestore niti menjati pravila. Za test potrošnje zatvoriti prikaz kolekcija u Firebase konzoli i sačekati ažuriranje metrike.
+
+## Napomena – 28.11.2026.
+Javni JSON katalozi vozila, ECU i DTC odvojeni su od privatne Firestore evidencije. Nije potrebna nova migracija niti dodatni ključ. Postojeća Firebase pravila ostaju nepromenjena; proveriti ih u konzoli jer ZIP ne sadrži `firestore.rules`.

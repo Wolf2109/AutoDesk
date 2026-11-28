@@ -14,3 +14,6 @@ GitHub Actions na main objavljuje Windows release v1.1.<GITHUB_RUN_NUMBER> sa NS
 
 ## Fullscreen
 Setup and Portable launch in fullscreen. Press F11 to toggle fullscreen, or Esc to exit fullscreen. Alt+F4 closes the application.
+
+## Referentne baze i stara izdanja
+Sve tri baze su obični JSON fajlovi, bez dodatnog ključa. Ručna sinhronizacija dostupna je u Podešavanjima. Nakon uspešne objave novog stabilnog Windows Release-a brišu se stariji stabilni Windows Releases `v1.1.N`, ali ne i Android `apk-latest`, Git tagovi, razvojna izdanja ili Actions artefakti.

@@ -169,3 +169,7 @@ html[data-theme=dark] .vs-power-pill{border-color:#5a2a30;border-radius:5px;colo
 html[data-theme=dark] .kpis .stat{transition:background-color var(--dur-base) var(--ease-out),border-color var(--dur-base) var(--ease-out),color var(--dur-fast) var(--ease-out)}
 html[data-theme=dark] tbody td{transition:background-color var(--dur-fast) var(--ease-out)}
 @media(prefers-reduced-motion:reduce){html[data-theme=dark] .kpis .stat,html[data-theme=dark] tbody td{transition:none!important}}
+
+/* Search fields share the vehicle picker surface in both themes. */
+html[data-theme=light] input.search,html[data-theme=light] input[type=search],html[data-theme=light] .vs-host .vs-result-search {background:#fff;color:var(--text);border-color:var(--line-strong)}
+html[data-theme=dark] input.search,html[data-theme=dark] input[type=search],html[data-theme=dark] .vs-host .vs-result-search {background:var(--secondary,#161719);color:var(--text);border-color:var(--line-strong)}
