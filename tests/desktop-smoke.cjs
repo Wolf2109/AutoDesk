@@ -10,6 +10,7 @@ test('desktop server serves app and all three databases',async()=>{
   for(const f of ['vehicles-database.json','ecu_database.json','dtc-database.json']) {
    const r=await fetch(base+'/data/'+f,{method:'HEAD'});assert.equal(r.status,200);assert.ok(Number(r.headers.get('content-length'))>0);
   }
+  const logo=await fetch(base+'/brands/5.png');assert.equal(logo.status,200);assert.equal(logo.headers.get('content-type'),'image/png');
   assert.equal((await fetch(base+'/missing')).status,404);
   assert.equal((await fetch(base+'/',{method:'POST'})).status,403);
  } finally {await new Promise(r=>server.close(r));}

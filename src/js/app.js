@@ -1134,6 +1134,7 @@ async function settingsPage() {
     let [s, backups] = await Promise.all([api('/settings'), api('/backups').catch(e => { backupsError = e.message; return []; })]);
     
     $('#content').innerHTML = 
+        `<section class="panel"><h3>Izgled aplikacije</h3><p class="subtle">Izaberite temu. Podešavanje se pamti na ovom uređaju.</p><div class="themeChoices" role="group" aria-label="Tema aplikacije">${[['dark','☾','Tamna'],['light','☀','Svetla'],['system','◐','Sistemska']].map(([v,i,l]) => `<button type="button" class="themeChoice" data-theme-choice="${v}" aria-pressed="${window.AutoDeskTheme?.get() === v}"><span class="themePreview ${v}" aria-hidden="true"><i></i><i></i><i></i></span><span class="themeLabel">${l}</span><span class="themeCheck" aria-hidden="true">✓</span></button>`).join('')}</div></section>` +
         `<section class="panel"><h3>Podaci radionice</h3>` +
         `<p class="subtle">Promena između RSD i EUR preračunava sve radne naloge i cene usluga po fiksnom kursu 1 EUR = 120 RSD. Iznosi se zaokružuju na dve decimale. Ostale valute nisu dostupne za konverziju bez definisanog kursa.</p>` +
         `<form id="settingsForm"><div class="formGrid">` +
