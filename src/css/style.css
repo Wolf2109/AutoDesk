@@ -1264,3 +1264,13 @@ body::after { background: linear-gradient(90deg, transparent, var(--accent), tra
 .vs-brand-logo[src$="/brands/446.png"],
 .vs-brand-logo[src$="/brands/451.png"],
 .vs-brand-logo[src$="/brands/454.png"]{background:#475569;}
+
+/* Consistent entity cards, including alternating table rows. */
+@media (max-width: 760px) {
+    .tableWrap.cards .entTbl tbody tr td[data-label] { display: flex; justify-content: space-between; gap: 14px; text-align: right; min-width: 0; overflow-wrap: anywhere; }
+    .tableWrap.cards .entTbl tbody tr td.cMain { display: block; text-align: left; }
+    .tableWrap.cards .entTbl tbody tr td.cEmpty,
+    .tableWrap.cards .entTbl tbody tr td[data-label]:empty { display: none; }
+    .tableWrap.cards .entTbl tbody tr td.cAct { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px; padding-top: 12px; border-top: 1px solid var(--line); }
+    .tableWrap.cards .entTbl tbody tr td.cAct button { flex: 1 1 0; min-width: 0; padding-inline: 4px; white-space: normal; }
+}

@@ -521,14 +521,23 @@ const tableColumns = {
     services: ['Usluga', 'Cena', '']
 };
 
-function entityRows(type, rows) {
+const hasEntityValue = v => v != null && String(v).trim() !== "";
+
+function entityColumns(type, rows) {
+    return tableColumns[type].map((_, i) => i).filter(i => {
+        const field = type === "vehicles" ? ({2: "registration", 3: "vin", 4: "mileage"})[i] : null;
+        return !field || rows.some(x => hasEntityValue(x[field]));
+    });
+}
+
+function entityRows(type, rows, columns = entityColumns(type, rows)) {
     const cols = tableColumns[type];
     return rows.map(x => {
         let vals = type === 'clients' ? [esc(x.name), x.phone ? telLink(x.phone) : '', esc(x.email)] :
-                   type === 'vehicles' ? [esc([x.make, x.model].filter(Boolean).join(' ')), esc(state.clients.find(c => c.id === x.client_id)?.name || ''), esc(x.registration), esc(x.vin), x.mileage != null && x.mileage !== '' ? nf(x.mileage) : ''] :
+                   type === 'vehicles' ? [esc([x.make, x.model].filter(Boolean).join(' ')), esc(state.clients.find(c => c.id === x.client_id)?.name || ''), hasEntityValue(x.registration) ? esc(x.registration) : '', hasEntityValue(x.vin) ? esc(x.vin) : '', hasEntityValue(x.mileage) ? nf(x.mileage) : ''] :
                    [esc(x.name), esc(fmt(x.price_amount))];
 
-        return `<tr>${vals.map((v, i) => `<td${i === 0 ? ' class="cMain"' : ''} data-label="${cols[i]}">${v}</td>`).join('')}` +
+        return `<tr>${vals.map((v, i) => columns.includes(i) ? `<td${i === 0 ? ' class="cMain"' : !hasEntityValue(v) ? ' class="cEmpty"' : ''} data-label="${cols[i]}">${hasEntityValue(v) ? v : ''}</td>` : '').join('')}` +
             `<td class="cAct"><button class="linkBtn" data-edit="${x.id}">Izmeni</button> ` +
             `<button class="linkBtn" data-delete="${x.id}" style="color:var(--red)">Obriši</button>` +
             `${type === 'clients' || type === 'vehicles' ? ` <button class="linkBtn" data-history="${x.id}">Istorija</button>` : ''}` +
@@ -637,9 +646,10 @@ async function listPage(type, params = {}) {
         }
 
         const visible = filtered.slice(0, shown);
+        const columns = isOrder ? [] : entityColumns(type, filtered);
         $('#tableContainer').innerHTML = (isOrder ?
             ordersTable(visible) :
-            `<div class="tableWrap cards"><table class="entTbl"><thead><tr>${tableColumns[type].map(h => `<th>${h}</th>`).join('')}</tr></thead><tbody>${entityRows(type, visible)}</tbody></table>${filtered.length ? '' : '<div class="empty">Nema unetih podataka.</div>'}</div>`) +
+            `<div class="tableWrap cards"><table class="entTbl"><thead><tr>${columns.map(i => `<th>${tableColumns[type][i]}</th>`).join('')}</tr></thead><tbody>${entityRows(type, visible, columns)}</tbody></table>${filtered.length ? '' : '<div class="empty">Nema unetih podataka.</div>'}</div>`) +
             (filtered.length > shown ? `<div class="loadMore"><button class="secondary" id="showMore">Prikaži još (${filtered.length - shown})</button></div>` : '');
         const more = $('#showMore');
         if (more) more.onclick = () => { shown += 100; renderTable(currentQ, false); };
