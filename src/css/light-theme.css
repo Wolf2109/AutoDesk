@@ -127,3 +127,45 @@ html[data-theme=light] .vs-brand-logo{outline-color:#d5dce5}
 html[data-theme=light] .kpis .stat{transition:background-color var(--dur-base) var(--ease-out),border-color var(--dur-base) var(--ease-out),color var(--dur-fast) var(--ease-out)}
 html[data-theme=light] tbody td{transition:background-color var(--dur-fast) var(--ease-out)}
 @media(prefers-reduced-motion:reduce){html[data-theme=light] nav button::after{transition:none}html[data-theme=light] .kpis .stat,html[data-theme=light] tbody td{transition:none!important}}
+
+/* ===== Tamna tema: ista struktura kao svetla (zaobljenja, senke, dugmad, kartice), samo tamna paleta. ===== */
+html[data-theme=dark]{--update-primary-text:#fff}
+html[data-theme=dark] #sidebar{box-shadow:2px 0 12px #00000030}
+html[data-theme=dark] nav button{border-radius:6px;letter-spacing:.025em}
+html[data-theme=dark] nav button.active{background:var(--accent-soft);color:var(--accent-hi)}
+html[data-theme=dark] header{box-shadow:0 2px 9px #00000030}
+html[data-theme=dark] header::after{height:1px;opacity:.35}
+html[data-theme=dark] .panel,html[data-theme=dark] .stat,html[data-theme=dark] .dialog,html[data-theme=dark] .loginBox{border:1px solid var(--line);border-radius:10px;box-shadow:0 2px 5px #00000026,0 8px 24px #00000026}
+html[data-theme=dark] .panel::before{left:12px;top:0;height:2px;width:26px;border-radius:0 0 2px 2px}
+html[data-theme=dark] .kpis .stat{background:var(--card);border-radius:8px;overflow:hidden}
+html[data-theme=dark] .twoCol .panel:last-child{background:var(--card)}
+html[data-theme=dark] .heroMain{clip-path:none;border-radius:10px;background:linear-gradient(145deg,#bd2532,#8c1825);box-shadow:0 8px 20px #9c253340}
+html[data-theme=dark] .heroMain .heroNew{background:#fff;color:#8c1825;border-radius:5px}
+html[data-theme=dark] .heroMain .heroNew:hover{background:#fcebef}
+html[data-theme=dark] .heroBtn{border-radius:5px}
+html[data-theme=dark] .heroSplit>div{border-radius:5px;background:#ffffff18}
+html[data-theme=dark] .primary{clip-path:none;border-radius:5px;min-height:42px}
+html[data-theme=dark] .secondary,html[data-theme=dark] .ghost,html[data-theme=dark] .danger,html[data-theme=dark] .iconBtn{border-radius:5px;min-height:38px}
+html[data-theme=dark] input,html[data-theme=dark] select,html[data-theme=dark] textarea{border-radius:5px!important}
+html[data-theme=dark] input:focus,html[data-theme=dark] select:focus,html[data-theme=dark] textarea:focus{box-shadow:0 0 0 3px #e3212b2e}
+html[data-theme=dark] :focus-visible{outline-color:var(--accent)}
+html[data-theme=dark] th{background:#1e2023;letter-spacing:.08em}
+html[data-theme=dark] tbody tr:hover td{background:var(--accent-soft)}
+html[data-theme=dark] .badge{border-radius:4px}
+html[data-theme=dark] #toast{border-radius:6px}
+html[data-theme=dark] .vs-host .vs-card{background:var(--card);border:1px solid var(--line);border-left:3px solid var(--accent);border-radius:8px;box-shadow:0 2px 7px #00000026}
+html[data-theme=dark] .vs-host .vs-input,html[data-theme=dark] .vs-host .vs-options{border-radius:6px}
+html[data-theme=dark] .vs-host .vs-input:focus-within,html[data-theme=dark] .vs-host .is-open .vs-input{border-color:var(--accent);box-shadow:0 0 0 3px #e3212b24}
+html[data-theme=dark] .vs-host .vs-toggle:hover,html[data-theme=dark] .vs-host .is-open .vs-toggle{color:var(--accent-hi)}
+html[data-theme=dark] .vs-host .vs-option[aria-selected=true]{color:var(--accent-hi);background:var(--accent-soft)}
+html[data-theme=dark] .vs-module-entry{border-radius:5px;background:var(--card-hi)}
+html[data-theme=dark] .vs-module-entry[open]{background:var(--card);border-color:#6b2a30}
+html[data-theme=dark] .vs-module-summary:hover{background:var(--accent-soft)}
+html[data-theme=dark] .vs-power-pill{border-color:#5a2a30;border-radius:5px;color:var(--accent-hi)}
+@media(max-width:760px){html[data-theme=dark] .panel,html[data-theme=dark] .heroMain,html[data-theme=dark] .dialog{border-radius:8px!important}html[data-theme=dark] .primary,html[data-theme=dark] .secondary,html[data-theme=dark] .ghost{min-height:44px}html[data-theme=dark] .vs-module-summary{min-height:44px;padding:12px}}
+@media (hover:hover){
+ html[data-theme=dark] .kpis .stat:hover{background:var(--card-hi)}
+}
+html[data-theme=dark] .kpis .stat{transition:background-color var(--dur-base) var(--ease-out),border-color var(--dur-base) var(--ease-out),color var(--dur-fast) var(--ease-out)}
+html[data-theme=dark] tbody td{transition:background-color var(--dur-fast) var(--ease-out)}
+@media(prefers-reduced-motion:reduce){html[data-theme=dark] .kpis .stat,html[data-theme=dark] tbody td{transition:none!important}}

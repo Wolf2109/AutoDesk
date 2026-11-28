@@ -2,6 +2,7 @@
 const VehicleSearch = (() => {
   let pending, outsideMenuController;
   globalThis.addEventListener?.('autodesk-catalog-sync', () => {pending=null;});
+  const collator=new Intl.Collator('sr-Latn',{numeric:true});
   const validCatalog = r=>Array.isArray(r)&&r.length>0&&!!r[0].brand_name;
   const year = v=>/^\d{4}$/.test(String(v??''))&&Number(v)>0?Number(v):null;
   const normalizeRow = r=>({ ...r, Brand:r.brand_name, Model:r.model_name, Version:r.version_name, Type:r.vehicle_type, Engine:r.engine_model, 'Engine type':r.engine_code, Fuel:r.fuel, 'Power(PS)':r.engine_power_ps, 'Power(KW)':r.engine_power_kw, 'Ecu maker':r.ecu_maker, 'Ecu model':r.ecu_name, 'MCU Type':r.type_of_ecu, 'Connection mode':r.working_modes, ProductionStart:year(r.produced_from_year), ProductionEnd:year(r.produced_to_year), ProductionOngoing:null });
@@ -18,7 +19,7 @@ const VehicleSearch = (() => {
     if (!validCatalog(rows)) throw Error('Neispravan format baze: ' + url);
     return rows.map(normalizeRow);
   })().catch(e=>{pending=null;throw e;});
-  const unique = (rows,key) => [...new Set(rows.map(r=>r[key] || ''))].sort((a,b)=>a.localeCompare(b,'sr-Latn',{numeric:true}));
+  const unique = (rows,key) => [...new Set(rows.map(r=>r[key] || ''))].sort(collator.compare);
   function generationPeriod(rows, version){
     const matches=rows.filter(r=>(r.Version||'')===version && Number.isFinite(r.ProductionStart));
     if(!matches.length)return {ProductionStart:null,ProductionEnd:null,ProductionOngoing:null};
@@ -26,7 +27,7 @@ const VehicleSearch = (() => {
   }
   function generationOptions(rows){
     const options=unique(rows,'Version'); const periods=new Map(options.map(v=>[v,generationPeriod(rows,v)]));
-    return options.sort((a,b)=>(periods.get(a).ProductionStart??Infinity)-(periods.get(b).ProductionStart??Infinity)||a.localeCompare(b,'sr-Latn',{numeric:true}));
+    return options.sort((a,b)=>(periods.get(a).ProductionStart??Infinity)-(periods.get(b).ProductionStart??Infinity)||collator.compare(a,b));
   }
   const period = r => r.ProductionStart == null ? (r.ProductionEnd == null ? '' : `→ - ${r.ProductionEnd}`) : r.ProductionEnd == null || r.ProductionOngoing === true ? `${r.ProductionStart} →` : r.ProductionStart === r.ProductionEnd ? String(r.ProductionStart) : `${r.ProductionStart}–${r.ProductionEnd}`;
   const name = v => !v || /^-+$/.test(v) ? 'Nije navedena' : v;
@@ -98,7 +99,7 @@ const VehicleSearch = (() => {
       const kw=Number(String(row['Power(KW)']??'').replace(',','.'));if(kw>0)g.kw.add(kw);
       if(row.Fuel)g.fuels.add(row.Fuel);
     });
-    return [...groups.values()].map(g=>({...g,codes:[...g.codes.values()],modules:groupECU(g.rows)})).sort((a,b)=>String(a.row.Engine||'').localeCompare(String(b.row.Engine||''),'sr-Latn',{numeric:true})||Number(a.row['Power(PS)'])-Number(b.row['Power(PS)']));
+    return [...groups.values()].map(g=>({...g,codes:[...g.codes.values()],modules:groupECU(g.rows)})).sort((a,b)=>collator.compare(String(a.row.Engine||''),String(b.row.Engine||''))||Number(a.row['Power(PS)'])-Number(b.row['Power(PS)']));
   }
   // Combine engine variants with exactly the same complete module set.
   function groupModuleSets(rows){
@@ -117,7 +118,11 @@ const VehicleSearch = (() => {
   const fuelGroup=r=>String(r.Fuel||'').trim()||'Unknown';
   const fuelLabels={Diesel:'Dizel',Petrol:'Benzin',Hybrid:'Hibrid',Electric:'Električni',Cng:'CNG',Lpg:'LPG',Bi_Fuel:'Dva goriva',Other_Fuel:'Ostalo',Ethanol:'Etanol',Unknown:'Nepoznato'};
   function brandLogo(id){if(!/^\d+$/.test(String(id??'')))return null;const img=el('img','vs-brand-logo');img.src='./brands/'+id+'.png';img.alt='';img.loading='lazy';img.onerror=()=>img.remove();return img;}
-  const searchRows=(rows,query)=>{const terms=query.trim().toLowerCase().split(/\s+/).filter(Boolean);return rows.filter(r=>{const text=['Brand','Model','Version','Engine','Engine type','Ecu maker','Ecu model','Power(PS)','Power(KW)','Fuel','Connection mode','Tool','ProductionStart','ProductionEnd'].map(k=>r[k]??'').join(' ').toLowerCase();return terms.every(t=>text.includes(t));});};
+  // Tekst za pretragu se gradi samo jednom po zapisu (ranije: za svih ~17.000 redova na svaki taster).
+  const SEARCH_KEYS=['Brand','Model','Version','Engine','Engine type','Ecu maker','Ecu model','Power(PS)','Power(KW)','Fuel','Connection mode','Tool','ProductionStart','ProductionEnd'];
+  const haystacks=new WeakMap();
+  const haystack=r=>{let h=haystacks.get(r);if(h===undefined){h=SEARCH_KEYS.map(k=>r[k]??'').join(' ').toLowerCase();haystacks.set(r,h);}return h;};
+  const searchRows=(rows,query)=>{const terms=query.trim().toLowerCase().split(/\s+/).filter(Boolean);return rows.filter(r=>{const text=haystack(r);return terms.every(t=>text.includes(t));});};
   const categories=[['cars','Automobili i kombiji'],['trucks','Kamioni i autobusi'],['heavy','Teška mehanizacija'],['other','Ostala vozila']];
   function vehicleCategory(r){
     const t=String(r.Type||'').trim().toLowerCase();
@@ -151,27 +156,52 @@ const VehicleSearch = (() => {
     const fuelTabs=el('div','vs-fuel-tabs');fuelTabs.hidden=true;host.insertBefore(fuelTabs,results);
 
     function vehicleRows(){return rows.filter(r=>vehicleCategory(r)===category&&(brand===null||(r.Brand||'')===brand)&&(model===null||(r.Model||'')===model)&&(version===null||(r.Version||'')===version));}
+    const MIN_QUERY=2, PAGE_SIZE=30, DEBOUNCE_MS=250;
+    let timer=null, cache={key:null,found:null,groups:null};
+    function computeGroups(q){
+      // Grupisanje je najskuplji korak, pa se radi samo jednom i pamti dok se upit/filter ne promene.
+      const key=JSON.stringify([category,type,brand,model,version,q]);
+      if(cache.key!==key){const found=searchRows(moduleRows(vehicleRows(),type),q);cache={key,found,groups:groupModuleSets(found)};}
+      return cache;
+    }
     function refresh(){
+      clearTimeout(timer);
       const q=search.value.trim(), complete=version!==null;
-      fuelTabs.hidden=!(complete||q);
-      if(!complete&&!q){results.replaceChildren(el('p','subtle','Izaberi vozilo ili unesi pojam za pretragu.'));return;}
-      const found=searchRows(moduleRows(vehicleRows(),type),q);
-      const fuels=[...new Set(found.map(fuelGroup))].sort((a,b)=>a.localeCompare(b));
+      if(!complete&&!q){fuelTabs.hidden=true;results.replaceChildren(el('p','subtle','Izaberi vozilo ili unesi pojam za pretragu.'));return;}
+      if(!complete&&q.length<MIN_QUERY){fuelTabs.hidden=true;results.replaceChildren(el('p','subtle',`Unesi bar ${MIN_QUERY} znaka.`));return;}
+      fuelTabs.hidden=false;
+      const {groups}=computeGroups(q);
+      // Svaka grupa ima tačno jedno gorivo, pa se brojači po gorivu dobijaju iz istog grupisanja.
+      const counts=new Map();for(const g of groups){const f=fuelGroup(g.row);counts.set(f,(counts.get(f)||0)+1);}
+      const fuels=[...counts.keys()].sort((a,b)=>a.localeCompare(b));
       if(fuel!==null&&!fuels.includes(fuel))fuel=null;
       fuelTabs.replaceChildren();
-      for(const f of fuels){const b=el('button','vs-module-tab vs-fuel-tab',(fuelLabels[f]||f)+' ('+groupModuleSets(found.filter(r=>fuelGroup(r)===f)).length+')');b.type='button';b.classList.toggle('is-active',fuel===f);b.setAttribute('aria-pressed',String(fuel===f));b.onclick=()=>{fuel=fuel===f?null:f;refresh();};fuelTabs.append(b);}
-
-      showResults(fuel===null?found:found.filter(r=>fuelGroup(r)===fuel));
+      for(const f of fuels){const b=el('button','vs-module-tab vs-fuel-tab',(fuelLabels[f]||f)+' ('+counts.get(f)+')');b.type='button';b.classList.toggle('is-active',fuel===f);b.setAttribute('aria-pressed',String(fuel===f));b.onclick=()=>{fuel=fuel===f?null:f;refresh();};fuelTabs.append(b);}
+      showResults(fuel===null?groups:groups.filter(g=>fuelGroup(g.row)===fuel));
     }
-    search.oninput=refresh;
+    // Pretraga se pokreće tek kad korisnik na trenutak prestane da kuca.
+    search.oninput=()=>{clearTimeout(timer);timer=setTimeout(refresh,DEBOUNCE_MS);};
+    search.onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();refresh();}};
     outsideMenuController?.abort();outsideMenuController=new AbortController();
     document.addEventListener('pointerdown',e=>{if(!host.isConnected){outsideMenuController?.abort();return;}for(const wrap of filters.querySelectorAll('.vs-picker.is-open'))if(!wrap.contains(e.target))wrap.vsClose?.();},{signal:outsideMenuController.signal});
-    function showResults(r){
-      results.replaceChildren();const groups=groupModuleSets(r);
-      results.append(el('h3','',`${groups.length} grupa računara · ${groups.reduce((n,g)=>n+g.variants.length,0)} varijanti motora · ${r.length} zapisa`));
+    function showResults(groups){
+      results.replaceChildren();
+      results.append(el('h3','',`${groups.length} grupa računara · ${groups.reduce((n,g)=>n+g.variants.length,0)} varijanti motora · ${groups.reduce((n,g)=>n+g.rows.length,0)} zapisa`));
       if(!groups.length){results.append(el('p','subtle','Nema rezultata za ovu pretragu.'));return;}
+      // Prikazuje se samo prvih PAGE_SIZE kartica; ostale na zahtev (hiljade DOM kartica su usporavale prikaz).
+      const list=el('div','vs-result-list');results.append(list);
+      let shown=0, more=null;
+      function renderMore(){
+        for(const g of groups.slice(shown,shown+PAGE_SIZE))list.append(groupCard(g));
+        shown=Math.min(groups.length,shown+PAGE_SIZE);
+        more?.remove();more=null;
+        if(shown<groups.length){more=el('button','btn',`Prikaži još (${groups.length-shown})`);more.type='button';more.onclick=renderMore;results.append(more);}
+      }
+      renderMore();
+    }
+    function groupCard(g){
       const detail=(grid,label,value)=>{const d=el('div');d.append(el('dt','',label),el('dd','',value||'—'));grid.append(d);};
-      for(const g of groups){
+      {
         const a=g.row,card=el('article','vs-card vs-engine-card');
         const head=el('div','vs-engine-card-head'), title=el('h4','',g.variants.length===1?(a.Engine||'Motor nije naveden'):`${g.variants.length} varijanti motora`);
         head.append(title);card.append(head);
@@ -199,7 +229,7 @@ const VehicleSearch = (() => {
           }
           block.append(body);modules.append(block);
         }
-        card.append(modules);results.append(card);
+        card.append(modules);return card;
       }
     }
     function openNext(wrap){wrap.vsOpen();}
