@@ -1,5 +1,5 @@
 'use strict';
-const CACHE = 'autodesk-ui-20261127-v51-manual-catalogs';
+const CACHE = 'autodesk-ui-20261127-v52-flex-catalog';
 const FILES = ['./', './index.html', './src/css/style.css', './src/css/site-theme.css', './src/css/motion.css?v=31', './config/firebase-config.js', './src/js/app.js', './src/js/update-config.js', './src/js/updates.js', './src/js/catalog-updates.js', './src/js/dtc.js', './src/js/vehicle-search.js', './src/js/ecu-search.js', './src/js/vehicle-search-config.js', './src/js/native-bridge.js', './src/js/print-docs.js', './src/js/local-api.js', './src/js/cloud-sync.js', './src/js/private-cache.js', './src/js/private-vehicles.js', './src/js/fuel.js', './src/js/tools.js', './manifest.json', './assets/icons/favicon.ico', './assets/images/logo.png', './assets/images/logo-mark.png', './assets/icons/icon-192.png', './assets/icons/icon-512.png'];
 const SDK = 'https://www.gstatic.com/firebasejs/';
 
@@ -24,7 +24,7 @@ self.addEventListener('fetch', e => {
 
   // Catalog requests are cache-first in catalog-updates.js; do not revalidate here.
   if (/\/data\/(vehicles-database|ecu_database|dtc-database)\.json$/.test(u.pathname)) {
-    if (req.cache === 'no-store') { e.respondWith(fetch(req)); return; }
+    if (req.cache === 'no-store' || req.cache === 'no-cache') { e.respondWith(fetch(req)); return; }
     e.respondWith(caches.match(req).then(hit => hit || fetch(req)));
     return;
   }

@@ -2,7 +2,7 @@
 // Public reference catalogs only; workshop/user data is independent.
 (() => {
   const validators = {
-    'vehicles-database.json': r => Array.isArray(r) && r.length > 0 && !!r[0].Brand,
+    'vehicles-database.json': r => Array.isArray(r) && r.length > 0 && !!r[0].brand_name,
     'ecu_database.json': r => Array.isArray(r) && r.length > 0 && 'bosch_number' in r[0],
     'dtc-database.json': r => !!r?.generic && !!r?.manufacturers
   };
@@ -22,10 +22,10 @@
     const cache = await openCache();
     try {return await read(await cache?.match(remote(name)), validate);} catch (_) {}
     // Installed apps read bundled files; web downloads only on first use if not cached.
-    const response = await fetch(local(name), {credentials:'omit', cache:'force-cache'});
+    const response = await fetch(local(name), {credentials:'omit', cache:name==='vehicles-database.json'?'no-cache':'force-cache'});
     const data = await read(response.clone(), validate);
     // Do not overwrite a newer manual sync with a bundled copy.
-    try {if (cache && !(await cache.match(remote(name)))) await cache.put(remote(name), response);} catch (_) {}
+    try {if (cache) await cache.put(remote(name), response);} catch (_) {}
     return data;
   };
   let busy = false;

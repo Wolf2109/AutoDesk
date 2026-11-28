@@ -18,7 +18,7 @@ fs.mkdirSync(out, { recursive: true });
 for (const f of ['index.html', 'manifest.json']) {
   fs.copyFileSync(path.join(root, f), path.join(out, f));
 }
-for (const d of ['src', 'config', 'assets/images', 'assets/icons']) {
+for (const d of ['src', 'config', 'assets/images', 'assets/icons', 'brands']) {
   fs.cpSync(path.join(root, d), path.join(out, d), { recursive: true });
 }
 // Bundle all catalogs for offline fallback.

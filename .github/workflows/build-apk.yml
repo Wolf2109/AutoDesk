@@ -10,6 +10,7 @@ on:
       - 'config/**'
       - 'assets/images/**'
       - 'assets/icons/**'
+      - 'brands/**'
       - 'data/dtc-database.json'
       - 'data/ecu_database.json'
       - 'data/vehicles-database.json'

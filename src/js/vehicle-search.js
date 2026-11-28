@@ -2,8 +2,11 @@
 const VehicleSearch = (() => {
   let pending, outsideMenuController;
   globalThis.addEventListener?.('autodesk-catalog-sync', () => {pending=null;});
+  const validCatalog = r=>Array.isArray(r)&&r.length>0&&!!r[0].brand_name;
+  const year = v=>/^\d{4}$/.test(String(v??''))&&Number(v)>0?Number(v):null;
+  const normalizeRow = r=>({ ...r, Brand:r.brand_name, Model:r.model_name, Version:r.version_name, Type:r.vehicle_type, Engine:r.engine_model, 'Engine type':r.engine_code, Fuel:r.fuel, 'Power(PS)':r.engine_power_ps, 'Power(KW)':r.engine_power_kw, 'Ecu maker':r.ecu_maker, 'Ecu model':r.ecu_name, 'MCU Type':r.type_of_ecu, 'Connection mode':r.working_modes, ProductionStart:year(r.produced_from_year), ProductionEnd:year(r.produced_to_year), ProductionOngoing:null });
   const load = () => pending ||= (async () => {
-    if(globalThis.loadAutoDeskCatalog) return globalThis.loadAutoDeskCatalog('vehicles-database.json', r=>Array.isArray(r)&&r.length>0&&!!r[0].Brand);
+    if(globalThis.loadAutoDeskCatalog) return (await globalThis.loadAutoDeskCatalog('vehicles-database.json', validCatalog)).map(normalizeRow);
     const url = globalThis.VEHICLE_DATABASE_URL;
     let response;
     try { response = await fetch(url, {credentials:'omit'}); }
@@ -12,33 +15,33 @@ const VehicleSearch = (() => {
     let rows;
     try { rows = await response.json(); }
     catch (_) { throw Error('Server nije vratio validan JSON: ' + url); }
-    if (!Array.isArray(rows) || !rows.length || !rows[0].Brand) throw Error('Neispravan format baze: ' + url);
-    return rows;
+    if (!validCatalog(rows)) throw Error('Neispravan format baze: ' + url);
+    return rows.map(normalizeRow);
   })().catch(e=>{pending=null;throw e;});
   const unique = (rows,key) => [...new Set(rows.map(r=>r[key] || ''))].sort((a,b)=>a.localeCompare(b,'sr-Latn',{numeric:true}));
   function generationPeriod(rows, version){
     const matches=rows.filter(r=>(r.Version||'')===version && Number.isFinite(r.ProductionStart));
     if(!matches.length)return {ProductionStart:null,ProductionEnd:null,ProductionOngoing:null};
-    const counts=new Map();
-    for(const r of matches){const key=JSON.stringify([r.ProductionStart,r.ProductionEnd,r.ProductionOngoing]);if(!counts.has(key))counts.set(key,{row:r,count:0});counts.get(key).count++;}
-    return [...counts.values()].sort((a,b)=>b.count-a.count||a.row.ProductionStart-b.row.ProductionStart)[0].row;
+    return {ProductionStart:Math.min(...matches.map(r=>r.ProductionStart)),ProductionEnd:matches.some(r=>r.ProductionEnd==null)?null:Math.max(...matches.map(r=>r.ProductionEnd)),ProductionOngoing:null};
   }
   function generationOptions(rows){
     const options=unique(rows,'Version'); const periods=new Map(options.map(v=>[v,generationPeriod(rows,v)]));
     return options.sort((a,b)=>(periods.get(a).ProductionStart??Infinity)-(periods.get(b).ProductionStart??Infinity)||a.localeCompare(b,'sr-Latn',{numeric:true}));
   }
-  const period = r => r.ProductionStart == null ? (r.ProductionEnd == null ? '' : `→ - ${r.ProductionEnd}`) : r.ProductionEnd == null || r.ProductionOngoing === true ? `${r.ProductionStart} - →` : r.ProductionStart === r.ProductionEnd ? String(r.ProductionStart) : `${r.ProductionStart}–${r.ProductionEnd}`;
+  const period = r => r.ProductionStart == null ? (r.ProductionEnd == null ? '' : `→ - ${r.ProductionEnd}`) : r.ProductionEnd == null || r.ProductionOngoing === true ? `${r.ProductionStart} – ?` : r.ProductionStart === r.ProductionEnd ? String(r.ProductionStart) : `${r.ProductionStart}–${r.ProductionEnd}`;
   const name = v => !v || /^-+$/.test(v) ? 'Nije navedena' : v;
   const el = (tag,cls,txt) => {const n=document.createElement(tag); if(cls)n.className=cls;if(txt!=null)n.textContent=txt;return n;};
-  function picker(parent,label,items,display,choose,initial=null){
+  function picker(parent,label,items,display,choose,initial=null,logoFor=null){
     const wrap=el('div','vs-picker field'), lab=el('label','',label), input=el('input'), list=el('div','vs-options'), toggle=el('button','vs-toggle');
     toggle.innerHTML='<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>';
     const id='vs-'+label; input.id=id;lab.htmlFor=id;input.type='search';input.placeholder='Izaberi ili pretraži '+label.toLocaleLowerCase();input.autocomplete='off';input.setAttribute('role','combobox');input.setAttribute('aria-autocomplete','list');input.setAttribute('aria-controls',id+'-options');input.setAttribute('aria-expanded','false');toggle.type='button';toggle.setAttribute('aria-label','Prikaži '+label);toggle.setAttribute('aria-expanded','false');toggle.setAttribute('aria-controls',id+'-options');list.id=id+'-options';list.setAttribute('role','listbox');list.hidden=true;
+    const selectedLogo=el('span','vs-selected-logo');selectedLogo.hidden=true;
+    function updateLogo(){selectedLogo.replaceChildren();const img=logoFor&&committed!==null?logoFor(committed):null;selectedLogo.hidden=!img;if(img)selectedLogo.append(img);}
     let active=-1, matches=[], committed=initial, open=false;
     const normalize=v=>String(v).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLocaleLowerCase();
-    function close(){open=false;wrap.classList.remove('is-open');input.setAttribute('aria-expanded','false');toggle.setAttribute('aria-expanded','false');input.removeAttribute('aria-activedescendant');list.hidden=true;input.value=committed===null?'':display(committed);}
+    function close(){open=false;wrap.classList.remove('is-open');input.setAttribute('aria-expanded','false');toggle.setAttribute('aria-expanded','false');input.removeAttribute('aria-activedescendant');list.hidden=true;input.value=committed===null?'':display(committed);updateLogo();}
     function select(v){committed=v;close();if(wrap.contains(document.activeElement))document.activeElement.blur();choose(v);}
-    function show(q=''){for(const other of parent.querySelectorAll('.vs-picker.is-open'))if(other!==wrap)other.vsClose?.();matches=items.filter(v=>normalize(display(v)).includes(normalize(q)));active=-1;input.removeAttribute('aria-activedescendant');list.replaceChildren();for(const [i,v] of matches.entries()){const b=el('button','vs-option',display(v));b.id=id+'-option-'+i;b.type='button';b.tabIndex=-1;b.setAttribute('role','option');b.setAttribute('aria-selected',String(v===committed));b.onpointerdown=e=>{if(e.pointerType==='mouse')e.preventDefault();};b.onclick=()=>select(v);list.append(b);}if(!matches.length)list.append(el('p','subtle','Nema rezultata'));list.scrollTop=0;if(!open){open=true;list.hidden=false;wrap.classList.add('is-open');input.setAttribute('aria-expanded','true');toggle.setAttribute('aria-expanded','true');}const rect=wrap.getBoundingClientRect();wrap.classList.toggle('opens-up',window.innerHeight-rect.bottom<210&&rect.top>window.innerHeight-rect.bottom);list.style.setProperty('--vs-available',Math.max(90,Math.min(280,(wrap.classList.contains('opens-up')?rect.top:window.innerHeight-rect.bottom)-12))+'px');}
+    function show(q=''){for(const other of parent.querySelectorAll('.vs-picker.is-open'))if(other!==wrap)other.vsClose?.();matches=items.filter(v=>normalize(display(v)).includes(normalize(q)));active=-1;input.removeAttribute('aria-activedescendant');list.replaceChildren();for(const [i,v] of matches.entries()){const b=el('button','vs-option');const img=logoFor?.(v);if(img)b.append(img);b.append(el('span','',display(v)));b.id=id+'-option-'+i;b.type='button';b.tabIndex=-1;b.setAttribute('role','option');b.setAttribute('aria-selected',String(v===committed));b.onpointerdown=e=>{if(e.pointerType==='mouse')e.preventDefault();};b.onclick=()=>select(v);list.append(b);}if(!matches.length)list.append(el('p','subtle','Nema rezultata'));list.scrollTop=0;if(!open){open=true;list.hidden=false;wrap.classList.add('is-open');input.setAttribute('aria-expanded','true');toggle.setAttribute('aria-expanded','true');}const rect=wrap.getBoundingClientRect();wrap.classList.toggle('opens-up',window.innerHeight-rect.bottom<210&&rect.top>window.innerHeight-rect.bottom);list.style.setProperty('--vs-available',Math.max(90,Math.min(280,(wrap.classList.contains('opens-up')?rect.top:window.innerHeight-rect.bottom)-12))+'px');}
     input.onfocus=()=>{if(!open)show('');if(committed!==null)input.select();};
     input.onclick=()=>{if(!open)show('');};input.oninput=()=>show(input.value);
     // The arrow opens only the list; it never focuses the text input.
@@ -48,7 +51,7 @@ const VehicleSearch = (() => {
     wrap.addEventListener('pointerdown',()=>{for(const other of parent.querySelectorAll('.vs-picker.is-open'))if(other!==wrap)other.vsClose?.();});
     wrap.vsClose=close;wrap.vsOpen=()=>show('');
     input.onkeydown=e=>{if(e.key==='Escape'){e.preventDefault();close();return;}if(e.key==='ArrowDown'||e.key==='ArrowUp'){e.preventDefault();if(!open)show('');if(!matches.length)return;active=active<0?(e.key==='ArrowDown'?0:matches.length-1):Math.max(0,Math.min(matches.length-1,active+(e.key==='ArrowDown'?1:-1)));[...list.children].forEach((b,i)=>b.classList.toggle('vs-active',i===active));input.setAttribute('aria-activedescendant',list.children[active].id);list.children[active]?.scrollIntoView({block:'nearest'});}if(e.key==='Enter'&&open){e.preventDefault();if(active>=0)select(matches[active]);else if(matches.length===1)select(matches[0]);}};
-    const line=el('div','vs-input');line.append(input,toggle);wrap.append(lab,line,list);parent.append(wrap);input.value=committed===null?'':display(committed);return wrap;
+    const line=el('div','vs-input');line.append(selectedLogo,input,toggle);wrap.append(lab,line,list);parent.append(wrap);input.value=committed===null?'':display(committed);updateLogo();return wrap;
   }
   function groupECU(rows){
     const norm=v=>String(v??'').trim().replace(/\s+/g,' ').toUpperCase();
@@ -60,8 +63,8 @@ const VehicleSearch = (() => {
       const g=groups.get(key);g.rows.push(row);
       // Merge engine codes only when the engine, power, fuel and support are identical.
       const mode=String(row['Connection mode']||'').split(',').map(x=>x.trim()).filter(Boolean).sort().join(', ');
-      const sig=JSON.stringify(['Tool'].map(k=>norm(row[k])).concat(norm(mode)));
-      if(!g.map.has(sig))g.map.set(sig,{row,codes:new Set(),support:[{tool:row.Tool,mode}]});
+      const sig=JSON.stringify([norm(mode),row.ProductionStart,row.ProductionEnd]);
+      if(!g.map.has(sig))g.map.set(sig,{row,codes:new Set(),support:[{mode}]});
       const code=String(row['Engine type']||'').trim();if(known(engineCode(code))&&![...g.map.get(sig).codes].some(c=>engineCode(c)===engineCode(code)))g.map.get(sig).codes.add(code);
     }
     return [...groups.values()].map(g=>({rows:g.rows,engines:[...g.map.values()].map(e=>({...e,codes:[...e.codes].sort()}))}));
@@ -78,7 +81,7 @@ const VehicleSearch = (() => {
     rows.forEach((row,i)=>{
       const ps=Number(String(row['Power(PS)']??'').replace(',','.'));
       if(!Number.isFinite(ps)||ps<=0)return;
-      const scope=JSON.stringify(['Brand','Model','Version','Type'].map(k=>engineNorm(row[k])).concat(fuelGroup(row),ps));
+      const scope=JSON.stringify(['Brand','Model','Version','Type'].map(k=>String(row[k]??'')).concat(fuelGroup(row),ps,row.ProductionStart,row.ProductionEnd));
       const code=engineCode(row['Engine type']), name=engineName(row.Engine);
       for(const [kind,value] of [['code',code],['name',name]]){
         if(!known(value))continue;
@@ -110,8 +113,10 @@ const VehicleSearch = (() => {
     }
     return [...merged.values()].map(g=>({...g,modules:groupECU(g.rows)}));
   }
-  const moduleRows=(rows,type)=>rows.filter(r=>String(r['MCU Type']).trim().toUpperCase()===(type==='ECU'?'ECM':'TCM'));
-  const fuelGroup=r=>/diesel|dizel/i.test(String(r.Fuel||''))?'Diesel':'Petrol';
+  const moduleRows=(rows,type)=>rows.filter(r=>String(r['MCU Type']).trim().toUpperCase()===(type==='ECU'?'ECM':type));
+  const fuelGroup=r=>String(r.Fuel||'').trim()||'Unknown';
+  const fuelLabels={Diesel:'Dizel',Petrol:'Benzin',Hybrid:'Hibrid',Electric:'Električni',Cng:'CNG',Lpg:'LPG',Bi_Fuel:'Dva goriva',Other_Fuel:'Ostalo',Ethanol:'Etanol',Unknown:'Nepoznato'};
+  function brandLogo(id){if(!/^\d+$/.test(String(id??'')))return null;const img=el('img','vs-brand-logo');img.src='./brands/'+id+'.png';img.alt='';img.loading='lazy';img.onerror=()=>img.remove();return img;}
   const searchRows=(rows,query)=>{const terms=query.trim().toLowerCase().split(/\s+/).filter(Boolean);return rows.filter(r=>{const text=['Brand','Model','Version','Engine','Engine type','Ecu maker','Ecu model','Power(PS)','Power(KW)','Fuel','Connection mode','Tool','ProductionStart','ProductionEnd'].map(k=>r[k]??'').join(' ').toLowerCase();return terms.every(t=>text.includes(t));});};
   const categories=[['cars','Automobili i kombiji'],['trucks','Kamioni i autobusi'],['heavy','Teška mehanizacija'],['other','Ostala vozila']];
   function vehicleCategory(r){
@@ -140,17 +145,22 @@ const VehicleSearch = (() => {
     const categoryButtons=categories.map(([id,label])=>{const b=el('button','vs-module-tab',label);b.type='button';b.onclick=()=>{if(category===id)return;category=id;brand=model=version=fuel=null;modelWrap=versionWrap=null;filters.replaceChildren();updateCategories();setup();};categoryTabs.append(b);return b;});
     function updateCategories(){categoryButtons.forEach((b,i)=>{const active=categories[i][0]===category;b.classList.toggle('is-active',active);b.setAttribute('aria-pressed',String(active));});const scoped=rows.filter(r=>vehicleCategory(r)===category);info.textContent=`${unique(scoped,'Brand').length} marki · ${scoped.length.toLocaleString('sr-Latn')} zapisa · ${categories.find(c=>c[0]===category)[1]}`;}
     updateCategories();
-    const buttons=['ECU','TCM'].map(t=>{const b=el('button','vs-module-tab',t);b.type='button';b.onclick=()=>{if(type!==t){type=t;updateModuleTabs();refresh();}};tabs.append(b);return b;});
-    function updateModuleTabs(){buttons.forEach((b,i)=>{const active=['ECU','TCM'][i]===type;b.classList.toggle('is-active',active);b.setAttribute('aria-pressed',String(active));});}
+    const moduleTypes=['ECU','TCM','ACM','OTHER'];
+    const buttons=moduleTypes.map(t=>{const b=el('button','vs-module-tab',t);b.type='button';b.onclick=()=>{if(type!==t){type=t;updateModuleTabs();refresh();}};tabs.append(b);return b;});
+    function updateModuleTabs(){buttons.forEach((b,i)=>{const active=moduleTypes[i]===type;b.classList.toggle('is-active',active);b.setAttribute('aria-pressed',String(active));});}
     const fuelTabs=el('div','vs-fuel-tabs');fuelTabs.hidden=true;host.insertBefore(fuelTabs,results);
-    const fuelButtons=['Diesel','Petrol'].map((f,i)=>{const b=el('button','vs-module-tab vs-fuel-tab',i===0?'Dizel':'Benzin');b.type='button';b.onclick=()=>{fuel=fuel===f?null:f;refresh();};fuelTabs.append(b);return b;});
+
     function vehicleRows(){return rows.filter(r=>vehicleCategory(r)===category&&(brand===null||(r.Brand||'')===brand)&&(model===null||(r.Model||'')===model)&&(version===null||(r.Version||'')===version));}
     function refresh(){
       const q=search.value.trim(), complete=version!==null;
       fuelTabs.hidden=!(complete||q);
       if(!complete&&!q){results.replaceChildren(el('p','subtle','Izaberi vozilo ili unesi pojam za pretragu.'));return;}
       const found=searchRows(moduleRows(vehicleRows(),type),q);
-      fuelButtons.forEach((b,i)=>{const f=['Diesel','Petrol'][i],active=fuel===f;b.classList.toggle('is-active',active);b.setAttribute('aria-pressed',String(active));b.textContent=(i===0?'Dizel':'Benzin')+' ('+groupModuleSets(found.filter(r=>fuelGroup(r)===f)).length+')';});
+      const fuels=[...new Set(found.map(fuelGroup))].sort((a,b)=>a.localeCompare(b));
+      if(fuel!==null&&!fuels.includes(fuel))fuel=null;
+      fuelTabs.replaceChildren();
+      for(const f of fuels){const b=el('button','vs-module-tab vs-fuel-tab',(fuelLabels[f]||f)+' ('+groupModuleSets(found.filter(r=>fuelGroup(r)===f)).length+')');b.type='button';b.classList.toggle('is-active',fuel===f);b.setAttribute('aria-pressed',String(fuel===f));b.onclick=()=>{fuel=fuel===f?null:f;refresh();};fuelTabs.append(b);}
+
       showResults(fuel===null?found:found.filter(r=>fuelGroup(r)===fuel));
     }
     search.oninput=refresh;
@@ -165,11 +175,11 @@ const VehicleSearch = (() => {
         const a=g.row,card=el('article','vs-card vs-engine-card');
         const head=el('div','vs-engine-card-head'), title=el('h4','',g.variants.length===1?(a.Engine||'Motor nije naveden'):`${g.variants.length} varijanti motora`);
         head.append(title);card.append(head);
-        if(version===null)card.append(el('p','subtle vs-vehicle-context',[a.Brand,a.Model,name(a.Version)].join(' · ')));
+        const context=el('div','vs-vehicle-context');const logo=brandLogo(a.brand_id);if(logo)context.append(logo);context.append(el('span','subtle',[a.Brand,a.Model,name(a.Version)].join(' · ')));card.append(context);
         for(const v of g.variants){
           const line=el('div','vs-variant-line'), h=el('div','vs-engine-card-head');
           h.append(el('strong','',v.row.Engine||'Motor nije naveden'),el('span','vs-power-pill',[v.row['Power(PS)']&&v.row['Power(PS)']+' KS',[...v.kw].map(k=>k+' kW').join(' / ')].filter(Boolean).join(' · ')));line.append(h);
-          const meta=el('dl','vs-details vs-engine-meta');detail(meta,'Gorivo',[...v.fuels].join(' / '));detail(meta,'Oznake motora',v.codes.join(' / '));line.append(meta);card.append(line);
+          const meta=el('dl','vs-details vs-engine-meta');detail(meta,'Gorivo',[...v.fuels].map(f=>fuelLabels[f]||f).join(' / '));detail(meta,'Godište',period(v.row));detail(meta,'Oznake motora',v.codes.join(' / '));line.append(meta);card.append(line);
         }
         card.append(el('h5','vs-engine-heading',`${type} računari (${g.modules.length})`));
         const modules=el('div','vs-module-list');
@@ -180,10 +190,10 @@ const VehicleSearch = (() => {
           for(const v of g.variants){
             const matching=v.modules.find(x=>['Ecu maker','Ecu model','MCU Type'].every(k=>engineNorm(x.rows[0][k]).replace(/\s+/g,' ')===engineNorm(m[k]).replace(/\s+/g,' ')));
             if(!matching)continue;
-            body.append(el('p','vs-engine-heading',`${v.row.Engine||'Motor'} · ${v.row['Power(PS)']||'—'} KS`));
+            body.append(el('p','vs-engine-heading',`${v.row.Engine||'Motor'} · ${v.row['Power(PS)']||'—'} KS · ${period(v.row)||'Godište nije navedeno'}`));
             for(const e of matching.engines){
               const grid=el('dl','vs-details');detail(grid,'Oznake motora',e.codes.join(' / '));
-              for(const support of e.support){detail(grid,'Alat',support.tool);detail(grid,'Modovi konekcije',support.mode);}
+              for(const support of e.support){detail(grid,'Godište',period(e.row));detail(grid,'Modovi konekcije',support.mode);}
               body.append(grid);
             }
           }
@@ -195,6 +205,7 @@ const VehicleSearch = (() => {
     function openNext(wrap){wrap.vsOpen();}
     function setup(){
       updateModuleTabs();
+      const brandIds=new Map(vehicleRows().map(r=>[r.Brand,r.brand_id]));
       picker(filters,'Marka',unique(vehicleRows(),'Brand'),name,b=>{
         if(brand===b&&modelWrap){openNext(modelWrap);return;}
         brand=b;model=version=null;fuel=null;modelWrap?.remove();versionWrap?.remove();versionWrap=null;
@@ -208,11 +219,11 @@ const VehicleSearch = (() => {
           refresh();openNext(versionWrap);
         });
         refresh();openNext(modelWrap);
-      });
+      },null,b=>brandLogo(brandIds.get(b)));
       refresh();
     }
     setup();
   }
-  return {render,unique,period,generationOptions,generationPeriod,groupECU,groupEngines,groupModuleSets,moduleRows,searchRows,fuelGroup,vehicleCategory};
+  return {render,normalizeRow,validCatalog,unique,period,generationOptions,generationPeriod,groupECU,groupEngines,groupModuleSets,moduleRows,searchRows,fuelGroup,vehicleCategory};
 })();
 if(typeof module!=='undefined')module.exports=VehicleSearch;
