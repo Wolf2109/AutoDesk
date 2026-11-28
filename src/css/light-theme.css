@@ -173,3 +173,46 @@ html[data-theme=dark] tbody td{transition:background-color var(--dur-fast) var(-
 /* Search fields share the vehicle picker surface in both themes. */
 html[data-theme=light] input.search,html[data-theme=light] input[type=search],html[data-theme=light] .vs-host .vs-result-search {background:#fff;color:var(--text);border-color:var(--line-strong)}
 html[data-theme=dark] input.search,html[data-theme=dark] input[type=search],html[data-theme=dark] .vs-host .vs-result-search {background:var(--secondary,#161719);color:var(--text);border-color:var(--line-strong)}
+
+/* Mobile: opaque sticky header and inexpensive shadows, in both themes. */
+@media (max-width: 760px), (hover: none) and (pointer: coarse) {
+    html[data-theme=light] header { background: var(--card); }
+    html[data-theme=dark] header { background: var(--bg); }
+    html[data-theme=dark] .panel, html[data-theme=dark] .stat, html[data-theme=dark] .dialog,
+    html[data-theme=light] .panel, html[data-theme=light] .stat, html[data-theme=light] .dialog {
+        box-shadow: 0 2px 5px #00000018;
+    }
+    html[data-theme=dark] tbody td, html[data-theme=light] tbody td { transition: none; }
+}
+
+/* Shared shape system: identical corner radius across themes and screen sizes. */
+:root { --ui-radius: 8px; --r-sm: var(--ui-radius); --r-md: var(--ui-radius); --r-lg: var(--ui-radius); }
+html[data-theme] :is(button, [role="button"], .primary, .secondary, .ghost, .danger, .iconBtn, .linkBtn, .chip, .badge, .navBadge, .themeChoice, .heroBtn, .heroNew, .vs-module-tab, .vs-fuel-tab) {
+    border-radius: var(--ui-radius) !important;
+    clip-path: none;
+}
+html[data-theme] :is(input, select, textarea, .vs-input, .vs-options, .vs-option, .vs-module-summary, .vs-power-pill, .vs-brand-logo) {
+    border-radius: var(--ui-radius) !important;
+}
+html[data-theme] :is(.panel, .stat, .dialog, .loginBox, .heroMain, .heroSplit > div, .syncBar, .remRow, .summaryRow > div, .tlCard, .tlExp, .vs-card, .vs-module-entry, .sidefoot, #today, #toast, .photoGrid img, .themePreview) {
+    border-radius: var(--ui-radius) !important;
+    clip-path: none;
+}
+/* Joined controls keep their internal seam flush. */
+html[data-theme] .vs-host .vs-input input { border-radius: var(--ui-radius) 0 0 var(--ui-radius) !important; }
+html[data-theme] .vs-host .vs-toggle { border-radius: 0 var(--ui-radius) var(--ui-radius) 0 !important; }
+html[data-theme] .tlCard::before { border-radius: var(--ui-radius) 0 0 var(--ui-radius); }
+@media (max-width: 760px) {
+    html[data-theme] .tableWrap.cards tbody tr { border-radius: var(--ui-radius) !important; }
+}
+
+/* Shared searchable selects use the vehicle-search control and menu styles. */
+select.shared-native-select { position:absolute!important; width:1px!important; height:1px!important; padding:0!important; margin:0!important; opacity:0!important; pointer-events:none!important; overflow:hidden!important; }
+.shared-select { min-width:0; flex:1 1 auto; }
+.shared-select .vs-input { min-width:0; }
+.shared-select .vs-input input { width:0; flex:1 1 0; min-width:0; }
+.shared-select .vs-toggle:disabled,.shared-select .vs-input input:disabled { opacity:.5; cursor:not-allowed; }
+.shared-select-portal { position:fixed; z-index:5000; margin:0; }
+.shared-select-portal .vs-options { position:relative; top:auto; bottom:auto; margin:0; width:100%; box-sizing:border-box; }
+.shared-select-portal.above .vs-options { transform:translateY(-100%); animation:none!important; }
+.shared-select-portal .vs-option { width:100%; }

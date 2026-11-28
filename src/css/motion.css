@@ -157,3 +157,11 @@ button:active:not(:disabled) { transform: translateY(0) scale(.98); transition-d
 
 /* Alati: zbirne kartice ostaju mirne pri promeni filtera. */
 #content.filter-update > .tlStats { animation: none; }
+
+/* Keep dialog/menu feedback, but avoid expensive chart and page reveals on touch devices. */
+@media (max-width: 760px), (hover: none) and (pointer: coarse) {
+    #content.page-enter > :not(.loader), #content.page-enter .chart,
+    #content.page-enter .cv, #content.page-enter .cx, #content.page-enter .cy,
+    #content.page-enter .barrow .bar, #content.filter-update > * { animation: none; }
+    tbody tr { transition: none; }
+}
